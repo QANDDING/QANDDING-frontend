@@ -1,6 +1,7 @@
 "use client";
+
 import { useEffect, useState, use } from 'react';
-import { getQuestionById } from '@/lib/localStore';
+import { questionApi } from '@/lib/api';
 
 type Question = {
   id: string;
@@ -17,7 +18,20 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
   const [question, setQuestion] = useState<Question | null>(null);
 
   useEffect(() => {
-    setQuestion(getQuestionById(id) || null);
+    let mounted = true;
+    (async () => {
+      try {
+        const q = await questionApi.getById(id);
+        if (!mounted) return;
+        setQuestion(q);
+      } catch (e) {
+        // 간단한 오류 처리
+        console.error(e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
   function handleAddComment(formData: FormData) {

@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { listQuestionsLocal } from '@/lib/localStore';
+import { questionApi, professorApi, subjectsApi } from '@/lib/api';
 
 type BoardItem = {
   id: string;
@@ -10,16 +10,40 @@ type BoardItem = {
   hasAnswer?: boolean;
   isAdopted?: boolean;
   createdAt?: string;
+  professorName?: string;
 };
+
+  type Professor = import('@/types/types').Professor;
 
 export default function BoardPage() {
   const [data, setData] = useState<{ items: BoardItem[] }>({ items: [] });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [subjectInput, setSubjectInput] = useState('');
+  const [selectedProfessorId, setSelectedProfessorId] = useState('');
+  const [professors, setProfessors] = useState<Professor[]>([]);
+  const [isLoadingProf, setIsLoadingProf] = useState(false);
 
   useEffect(() => {
-    const result = listQuestionsLocal(1, 20);
-    setData(result);
+    let mounted = true;
+    (async () => {
+      try {
+        const result = await questionApi.getList({ page: 0, size: 20 });
+        if (!mounted) return;
+        // 스웨거 명세에 맞춰 content 배열 사용
+        setData({ items: result.content || [] });
+      } catch (e) {
+        console.error(e);
+        if (e instanceof Error && e.message === 'Authentication required') {
+          alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+          window.location.href = '/login';
+          return;
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const categories = [
@@ -40,6 +64,37 @@ export default function BoardPage() {
     return matchesSearch && matchesCategory;
   });
 
+  const normalizedSubject = subjectInput.trim();
+  const filteredProfessors = professors;
+  const selectedProfessor = professors.find((p) => p.id.toString() === selectedProfessorId) || null;
+
+  const handleSubjectSearch = async () => {
+    const keyword = subjectInput.trim();
+    setSelectedProfessorId('');
+    setIsLoadingProf(true);
+    try {
+      // 먼저 과목 검색 후 과목 ID를 얻어야 함
+      const subjects = await subjectsApi.search(keyword);
+      if (subjects.length > 0) {
+        const firstSubject = subjects[0];
+        const list = await professorApi.getBySubjectId(firstSubject.id);
+        setProfessors(list);
+      } else {
+        setProfessors([]);
+      }
+    } catch (e) {
+      console.error(e);
+      if (e instanceof Error && e.message === 'Authentication required') {
+        alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+        window.location.href = '/login';
+        return;
+      }
+      setProfessors([]);
+    } finally {
+      setIsLoadingProf(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 섹션 */}
@@ -50,12 +105,14 @@ export default function BoardPage() {
               <h1 className="text-2xl font-bold text-gray-900 mb-2">자주 묻는 질문</h1>
               <p className="text-gray-600">질문과 답변을 찾아보세요</p>
             </div>
-            <Link 
-              href='/ask' 
-              className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              질문하기
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link 
+                href='/ask' 
+                className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                질문하기
+              </Link>
+            </div>
           </div>
 
           {/* 검색바 */}
@@ -76,6 +133,72 @@ export default function BoardPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
+        </div>
+
+        {/* 과목별 교수님 찾기 */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">과목별 교수님 찾기</h2>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="과목을 입력하세요 (예: 자료구조)"
+                value={subjectInput}
+                onChange={(e) => {
+                  setSubjectInput(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubjectSearch();
+                }}
+                className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={handleSubjectSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700"
+                aria-label="과목 검색"
+              >
+                검색
+              </button>
+            </div>
+            <select
+              value={selectedProfessorId}
+              onChange={(e) => setSelectedProfessorId(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="">{isLoadingProf ? '불러오는 중...' : '교수님을 선택하세요'}</option>
+              {filteredProfessors.map((p) => (
+                <option key={p.id} value={p.id}>{`${p.name}`}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedProfessor && (
+            <div className="mt-4 rounded-md bg-gray-50 border border-gray-200 p-4">
+              <div className="grid sm:grid-cols-3 gap-3 text-sm text-gray-800">
+                <div>
+                  <div className="text-gray-500">이름</div>
+                  <div className="font-medium">{selectedProfessor.name}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">담당 과목</div>
+                  <div className="font-medium">{selectedProfessor.subjectName}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">연락처</div>
+                  <div className="font-medium">{selectedProfessor.phone || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">이메일</div>
+                  <div className="font-medium">{selectedProfessor.email || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-gray-500">연구실</div>
+                  <div className="font-medium">{selectedProfessor.office || '-'}</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -156,6 +279,12 @@ export default function BoardPage() {
                               <span>{item.createdAt}</span>
                             </>
               )}
+                          {item.professorName && (
+                            <>
+                              <span className="mx-2">•</span>
+                              <span>{item.professorName}</span>
+                            </>
+                          )}
             </div>
                       </div>
                       <div className="ml-4 flex-shrink-0">

@@ -1,7 +1,8 @@
 "use client";
+
 import Link from 'next/link';
 import { useEffect, useState, use } from 'react';
-import { listQuestionsLocal } from '@/lib/localStore';
+import { questionApi } from '@/lib/api';
 
 type HistoryItem = {
   id: string;
@@ -11,6 +12,7 @@ type HistoryItem = {
   createdAt: string;
   hasAnswer?: boolean;
   isAdopted?: boolean;
+  professorName?: string;
 };
 
 const PAGE_SIZE = 10;
@@ -28,18 +30,29 @@ export default function HistoryPage({
   const page = Math.max(1, Number(resolvedParams?.page || 1));
 
   useEffect(() => {
-    const result = listQuestionsLocal(page, PAGE_SIZE);
-    setData(result);
+    let mounted = true;
+    (async () => {
+      try {
+        // 스웨거 명세에 맞춰 page는 0부터 시작
+        const result = await questionApi.getList({ page: page - 1, size: PAGE_SIZE });
+        if (!mounted) return;
+        // 스웨거 명세에 맞춰 content 배열과 totalElements 사용
+        setData({ 
+          items: (result.content || []) as unknown as HistoryItem[], 
+          total: result.totalElements || 0 
+        });
+        const uniqueSubjects = Array.from(new Set((result.content || []).map((i: any) => i.subject)));
+        setSubjects(uniqueSubjects);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [page]);
 
-  const subjects = [
-    { id: 'all', name: '전체' },
-    { id: '수학', name: '수학' },
-    { id: '영어', name: '영어' },
-    { id: '국어', name: '국어' },
-    { id: '과학', name: '과학' },
-    { id: '사회', name: '사회' },
-  ];
+ 
 
   const filteredItems = data.items.filter(item => {
     const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -169,6 +182,9 @@ export default function HistoryPage({
                         </p>
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="px-2 py-1 bg-gray-100 rounded-full">{item.subject}</span>
+                          {('professorName' in item) && (item as any).professorName && (
+                            <span className="px-2 py-1 bg-gray-100 rounded-full">{(item as any).professorName}</span>
+                          )}
                           <span>질문 #{item.id}</span>
                           {item.createdAt && (
                             <>

@@ -6,6 +6,8 @@ export type Question = {
   createdAt: string;
   hasAnswer?: boolean;
   isAdopted?: boolean;
+  professorId?: string;
+  professorName?: string;
 };
 
 const questions: Question[] = [];
