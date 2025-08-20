@@ -354,8 +354,6 @@ export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
     const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
     console.log('구글 로그인 시작:', {
-      baseUrl: BASE_URL,
-      loginUrl: loginUrl,
       currentUrl: window.location.href,
       userAgent: navigator.userAgent
     });
