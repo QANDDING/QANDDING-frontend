@@ -11,7 +11,7 @@ import {
 import { getAccessToken, removeAccessToken } from './auth';
 
 // API 기본 설정
-const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL || 'https://qandding.store';
+const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
 console.log('API BASE_URL:', BASE_URL);
 
 
