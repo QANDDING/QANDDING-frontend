@@ -10,14 +10,18 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('로그인 페이지 로드됨');
+    
     // 이미 인증된 상태라면 메인 페이지로 이동
     if (isAuthenticated()) {
+      console.log('이미 인증된 사용자, 메인 페이지로 이동');
       redirectToMain();
       return;
     }
 
     // 구글 로그인 콜백 처리 (URL 파라미터에서 토큰과 사용자 정보 추출)
     if (handleGoogleLoginCallback()) {
+      console.log('구글 로그인 콜백 처리 완료, 메인 페이지로 이동');
       // 토큰이 성공적으로 저장되었으면 메인 페이지로 이동
       redirectToMain();
       return;
@@ -26,13 +30,17 @@ export default function LoginPage() {
     // 로그인된 세션이 이미 있으면 메인으로 이동
     (async () => {
       try {
+        console.log('기존 세션 확인 중...');
         const me = await userApi.getProfile();
         if (me && me.id) {
+          console.log('기존 세션 발견, 사용자 정보 저장');
           saveAuthUser(me);
           // 로그인 성공 시 바로 메인 페이지로 이동
           router.replace('/');
         }
-      } catch {}
+      } catch (error) {
+        console.log('기존 세션 없음 또는 에러:', error);
+      }
     })();
   }, [router]);
 

@@ -12,10 +12,13 @@ import { getAccessToken, removeAccessToken } from './auth';
 
 // API 기본 설정
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL || 'https://qandding.store';
+console.log('API BASE_URL:', BASE_URL);
 
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
-  return getAccessToken();
+  const token = getAccessToken();
+  console.log('API 호출용 토큰 조회:', token ? '토큰 있음' : '토큰 없음');
+  return token;
 };
 
 // 질문 관련 API
@@ -30,7 +33,11 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   if (params.professorId) searchParams.append('professorId', params.professorId.toString());
 
   const queryString = searchParams.toString();
-  const response = await fetch(`${BASE_URL}/api/questions${queryString ? `?${queryString}` : ''}`, {
+  const url = `${BASE_URL}/api/questions${queryString ? `?${queryString}` : ''}`;
+  
+  console.log('질문 목록 API 호출:', url);
+  
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       Cookie: `ACCESS_TOKEN=${token}`,
@@ -38,11 +45,16 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
     credentials: 'include',
   });
 
+  console.log('질문 목록 API 응답:', response.status, response.statusText);
+
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('질문 목록 API 에러:', response.status, errorText);
     throw new Error(`Failed to fetch questions: ${response.status}`);
   }
 
   const data = await response.json();
+  console.log('질문 목록 데이터:', data);
   return data;
 }
 
@@ -338,7 +350,7 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    window.location.href = `${BASE_URL}/login/oauth2/code/google`;
+    window.location.href = `${BASE_URL}login/oauth2/code/google`;
   }
 }
 
