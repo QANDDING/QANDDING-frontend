@@ -14,6 +14,8 @@ import { getAccessToken, removeAccessToken } from './auth';
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL || 'https://qandding.store';
 console.log('API BASE_URL:', BASE_URL);
 
+
+
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
   const token = getAccessToken();
@@ -350,7 +352,9 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    window.location.href = `${BASE_URL}login/oauth2/code/google`;
+    const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
+    console.log('구글 로그인 URL:', loginUrl);
+    window.location.href = loginUrl;
   }
 }
 
