@@ -64,7 +64,6 @@ export default function BoardPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const normalizedSubject = subjectInput.trim();
   const filteredProfessors = professors;
   const selectedProfessor = professors.find((p) => p.id.toString() === selectedProfessorId) || null;
 
@@ -241,7 +240,7 @@ export default function BoardPage() {
             </div>
           ) : (
             <ul className="divide-y divide-gray-200">
-              {filteredItems.map((item: BoardItem, index: number) => (
+              {filteredItems.map((item: BoardItem) => (
                 <li key={item.id} className="hover:bg-gray-50 transition-colors">
                   <Link href={`/board/${item.id}`} className="block p-6">
                     <div className="flex items-start justify-between">

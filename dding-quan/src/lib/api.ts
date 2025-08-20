@@ -1,12 +1,10 @@
 import {
   Question,
   CreateQuestionRequest,
-  UpdateQuestionRequest,
   Answer,
   CreateAnswerRequest,
   PaginatedResponse,
   QuestionListParams,
-  FileUploadResponse,
   User,
   Professor,
 } from '../types/types'

@@ -41,7 +41,7 @@ export default function HistoryPage({
           items: (result.content || []) as unknown as HistoryItem[], 
           total: result.totalElements || 0 
         });
-        const uniqueSubjects = Array.from(new Set((result.content || []).map((i: any) => i.subject)));
+        const uniqueSubjects = Array.from(new Set((result.content || []).map((i: { subject: string }) => i.subject)));
         setSubjects(uniqueSubjects);
       } catch (e) {
         console.error(e);
@@ -182,8 +182,8 @@ export default function HistoryPage({
                         </p>
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="px-2 py-1 bg-gray-100 rounded-full">{item.subject}</span>
-                          {('professorName' in item) && (item as any).professorName && (
-                            <span className="px-2 py-1 bg-gray-100 rounded-full">{(item as any).professorName}</span>
+                          {('professorName' in item) && (item as { professorName?: string }).professorName && (
+                            <span className="px-2 py-1 bg-gray-100 rounded-full">{(item as { professorName?: string }).professorName}</span>
                           )}
                           <span>질문 #{item.id}</span>
                           {item.createdAt && (

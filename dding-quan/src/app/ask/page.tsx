@@ -32,7 +32,7 @@ export default function AskPage() {
   async function handleDetailSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const formSubject = String(formData.get('subject') || '').trim();
+
     const files: File[] = [];
     if (selectedFiles.pdf) files.push(selectedFiles.pdf);
     if (selectedFiles.image) files.push(selectedFiles.image);
@@ -74,7 +74,7 @@ export default function AskPage() {
     setLoadingProf(true);
     try {
       const list = await professorApi.getBySubjectId(selectedSubjectId);
-      setProfessors(list.map((p: any) => ({ id: p.id.toString(), name: p.name })));
+      setProfessors(list.map((p: { id: number; name: string }) => ({ id: p.id.toString(), name: p.name })));
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'Authentication required') {
@@ -315,7 +315,7 @@ export default function AskPage() {
                     if (res.content && contentTextareaRef.current) {
                       contentTextareaRef.current.value = res.content;
                     }
-                  } catch (e) {
+                  } catch {
                     alert('AI 제안에 실패했습니다.');
                   } finally {
                     setAiLoading(false);
