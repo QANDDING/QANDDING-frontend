@@ -352,7 +352,7 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
+    const loginUrl = `${BASE_URL}/oauth2/code/google`;
     console.log('구글 로그인 시작:', {
       currentUrl: window.location.href,
       userAgent: navigator.userAgent
