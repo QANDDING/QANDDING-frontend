@@ -3,13 +3,26 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { userApi, startGoogleLogin } from '../../lib/api';
-import { saveAuthUser } from '@/lib/auth';
+import { saveAuthUser, handleGoogleLoginCallback, isAuthenticated, redirectToMain } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // 이미 인증된 상태라면 메인 페이지로 이동
+    if (isAuthenticated()) {
+      redirectToMain();
+      return;
+    }
+
+    // 구글 로그인 콜백 처리 (URL 파라미터에서 토큰과 사용자 정보 추출)
+    if (handleGoogleLoginCallback()) {
+      // 토큰이 성공적으로 저장되었으면 메인 페이지로 이동
+      redirectToMain();
+      return;
+    }
+
     // 로그인된 세션이 이미 있으면 메인으로 이동
     (async () => {
       try {

@@ -8,14 +8,14 @@ import {
   User,
   Professor,
 } from '../types/types'
+import { getAccessToken, removeAccessToken } from './auth';
 
 // API 기본 설정
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL || 'https://qandding.store';
 
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('ACCESS_TOKEN');
+  return getAccessToken();
 };
 
 // 질문 관련 API
@@ -310,7 +310,7 @@ export async function logout(): Promise<void> {
     credentials: 'include',
   });
 
-  localStorage.removeItem('ACCESS_TOKEN');
+  removeAccessToken();
   
   if (!response.ok) {
     console.warn('Logout request failed, but token was removed locally');

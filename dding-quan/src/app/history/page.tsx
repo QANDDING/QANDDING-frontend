@@ -1,8 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { questionApi } from '@/lib/api';
+import { isAuthenticated } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 type HistoryItem = {
   id: string;
@@ -17,19 +19,21 @@ type HistoryItem = {
 
 const PAGE_SIZE = 10;
 
-export default function HistoryPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ page?: string }>;
-}) {
+export default function HistoryPage() {
+  const router = useRouter();
   const [data, setData] = useState<{ items: HistoryItem[]; total: number }>({ items: [], total: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [subjects, setSubjects] = useState<string[]>([]);
-  const resolvedParams = searchParams ? use(searchParams) : { page: '1' };
-  const page = Math.max(1, Number(resolvedParams?.page || 1));
+  const [page] = useState(1);
 
   useEffect(() => {
+    // 인증 상태 확인
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+
     let mounted = true;
     (async () => {
       try {
@@ -50,7 +54,7 @@ export default function HistoryPage({
     return () => {
       mounted = false;
     };
-  }, [page]);
+  }, [page, router]);
 
  
 

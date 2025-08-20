@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { questionApi, professorApi, subjectsApi } from '@/lib/api';
+import { isAuthenticated } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 type BoardItem = {
   id: string;
@@ -16,6 +18,7 @@ type BoardItem = {
   type Professor = import('@/types/types').Professor;
 
 export default function BoardPage() {
+  const router = useRouter();
   const [data, setData] = useState<{ items: BoardItem[] }>({ items: [] });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -25,6 +28,12 @@ export default function BoardPage() {
   const [isLoadingProf, setIsLoadingProf] = useState(false);
 
   useEffect(() => {
+    // 인증 상태 확인
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+
     let mounted = true;
     (async () => {
       try {
@@ -44,7 +53,7 @@ export default function BoardPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [router]);
 
   const categories = [
     { id: 'all', name: '전체' },
