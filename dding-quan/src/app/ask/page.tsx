@@ -120,15 +120,24 @@ function AskPageContent() {
       return;
     }
     try {
+      console.log('과목 검색 시작:', keyword);
       const suggestions = await subjectsApi.search(keyword);
+      console.log('과목 검색 성공:', suggestions);
       setSubjectSuggestions(suggestions);
     } catch (e) {
-      console.error(e);
+      console.error('과목 검색 에러:', e);
       if (e instanceof Error && e.message === 'Authentication required') {
-        alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+        console.log('Authentication required, redirecting to login');
         window.location.href = '/login';
         return;
       }
+      
+      // 500 에러인 경우 사용자에게 알림
+      if (e instanceof Error && e.message.includes('500')) {
+        console.error('서버 내부 에러 발생:', e.message);
+        alert('Subject search failed due to server error. Please try again later.');
+      }
+      
       setSubjectSuggestions([]);
     }
   }
