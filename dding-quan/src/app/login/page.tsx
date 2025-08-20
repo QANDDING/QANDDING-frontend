@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { userApi, startGoogleLogin } from '../../lib/api';
-import { saveAuthUser, handleGoogleLoginCallback, isAuthenticated, redirectToMain } from '@/lib/auth';
+import { saveAuthUser, isAuthenticated, redirectToMain } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -19,21 +19,7 @@ export default function LoginPage() {
       return;
     }
 
-    // 구글 로그인 콜백 처리 (URL 파라미터에서 토큰과 사용자 정보 추출)
-    const callbackResult = handleGoogleLoginCallback();
-    if (callbackResult) {
-      console.log('구글 로그인 콜백 처리 완료, 메인 페이지로 이동');
-      // 토큰이 성공적으로 저장되었으면 메인 페이지로 이동
-      redirectToMain();
-      return;
-    }
-    
-    // 콜백 URL에 파라미터가 있지만 처리가 실패한 경우 (에러 처리됨)
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('success') === 'false') {
-      console.log('OAuth2 로그인 실패로 인해 로그인 페이지에 머무름');
-      return;
-    }
+    // OAuth 콜백은 /oauth/callback 페이지에서 처리됨
 
     // 로그인된 세션이 이미 있으면 메인으로 이동
     (async () => {

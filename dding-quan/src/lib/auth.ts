@@ -15,9 +15,28 @@ function safeStorage(): Storage | null {
 
 export function saveAuthUser(user: User): void {
   const s = safeStorage();
-  if (!s) return;
-  s.setItem(AUTH_USER_KEY, JSON.stringify(user));
-  s.setItem(AUTH_TIME_KEY, String(Date.now()));
+  if (!s) {
+    console.error('로컬 스토리지를 사용할 수 없어 사용자 정보를 저장할 수 없습니다');
+    return;
+  }
+  
+  try {
+    console.log('사용자 정보 저장 중:', { id: user.id, email: user.email, name: user.name });
+    s.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    s.setItem(AUTH_TIME_KEY, String(Date.now()));
+    
+    // 저장 확인
+    const savedUser = s.getItem(AUTH_USER_KEY);
+    const savedTime = s.getItem(AUTH_TIME_KEY);
+    
+    if (savedUser && savedTime) {
+      console.log('사용자 정보 저장 완료 및 검증 성공');
+    } else {
+      console.error('사용자 정보 저장 실패');
+    }
+  } catch (error) {
+    console.error('사용자 정보 저장 중 에러:', error);
+  }
 }
 
 export function getAuthUser(): User | null {
@@ -52,9 +71,19 @@ export function saveAccessToken(token: string): void {
     console.error('로컬 스토리지를 사용할 수 없습니다');
     return;
   }
-  console.log('토큰 저장 중:', token.substring(0, 10) + '...');
-  s.setItem(ACCESS_TOKEN_KEY, token);
-  console.log('토큰 저장 완료');
+  console.log('토큰 저장 중:', token.substring(0, 20) + '...');
+  try {
+    s.setItem(ACCESS_TOKEN_KEY, token);
+    // 저장 확인
+    const savedToken = s.getItem(ACCESS_TOKEN_KEY);
+    if (savedToken === token) {
+      console.log('토큰 저장 완료 및 검증 성공');
+    } else {
+      console.error('토큰 저장 실패: 저장된 토큰이 다름');
+    }
+  } catch (error) {
+    console.error('토큰 저장 중 에러:', error);
+  }
 }
 
 export function getAccessToken(): string | null {
@@ -71,16 +100,38 @@ export function removeAccessToken(): void {
 
 // 구글 로그인 후 토큰 처리
 export function handleGoogleLoginSuccess(token: string, user: User, refreshToken?: string): void {
+  console.log('구글 로그인 성공 처리 시작');
+  
+  // 액세스 토큰 저장
   saveAccessToken(token);
+  
+  // 리프레시 토큰 저장
   if (refreshToken) {
-    // 리프레시 토큰도 저장
     const s = safeStorage();
     if (s) {
-      s.setItem('REFRESH_TOKEN', refreshToken);
-      console.log('리프레시 토큰 저장 완료');
+      try {
+        console.log('리프레시 토큰 저장 중...');
+        s.setItem('REFRESH_TOKEN', refreshToken);
+        const savedRefreshToken = s.getItem('REFRESH_TOKEN');
+        if (savedRefreshToken === refreshToken) {
+          console.log('리프레시 토큰 저장 완료');
+        } else {
+          console.error('리프레시 토큰 저장 실패');
+        }
+      } catch (error) {
+        console.error('리프레시 토큰 저장 중 에러:', error);
+      }
+    } else {
+      console.error('로컬 스토리지를 사용할 수 없어 리프레시 토큰을 저장할 수 없습니다');
     }
+  } else {
+    console.log('리프레시 토큰이 없습니다');
   }
+  
+  // 사용자 정보 저장
   saveAuthUser(user);
+  
+  console.log('구글 로그인 성공 처리 완료');
 }
 
 // URL 파라미터에서 토큰과 사용자 정보 추출하여 저장
@@ -131,8 +182,17 @@ export function handleGoogleLoginCallback(): boolean {
   // 로그인 성공 처리
   if (success === 'true' && accessToken) {
     try {
+      console.log('JWT 토큰 파싱 시작...');
+      console.log('액세스 토큰 길이:', accessToken.length);
+      
+      // JWT 토큰 구조 확인
+      const tokenParts = accessToken.split('.');
+      if (tokenParts.length !== 3) {
+        throw new Error(`Invalid JWT format: expected 3 parts, got ${tokenParts.length}`);
+      }
+      
       // JWT 토큰에서 사용자 정보 추출
-      const tokenPayload = JSON.parse(atob(accessToken.split('.')[1]));
+      const tokenPayload = JSON.parse(atob(tokenParts[1]));
       console.log('토큰 페이로드:', tokenPayload);
       
       // 사용자 정보 구성
