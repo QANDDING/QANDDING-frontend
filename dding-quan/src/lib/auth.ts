@@ -92,14 +92,43 @@ export function handleGoogleLoginCallback(): boolean {
   const accessToken = urlParams.get('accessToken');
   const refreshToken = urlParams.get('refreshToken');
   const needsProfile = urlParams.get('needsProfile');
+  const error = urlParams.get('error');
+  const errorType = urlParams.get('errorType');
   
   console.log('구글 로그인 콜백 처리:', { 
     success, 
     accessToken: accessToken ? '토큰 있음' : '토큰 없음', 
     refreshToken: refreshToken ? '리프레시 토큰 있음' : '리프레시 토큰 없음',
-    needsProfile
+    needsProfile,
+    error,
+    errorType
   });
   
+  // 로그인 실패 처리
+  if (success === 'false') {
+    console.error('OAuth2 로그인 실패:', { error, errorType });
+    
+    // URL 파라미터 정리
+    window.history.replaceState({}, '', window.location.pathname);
+    
+    // 사용자에게 에러 메시지 표시
+    let errorMessage = 'Login failed. Please try again.';
+    if (error) {
+      // 한글 에러 메시지를 영어로 변환
+      if (error.includes('OAuth2 요청이 잘못되었습니다')) {
+        errorMessage = 'OAuth2 request is invalid. Please try again.';
+      } else if (error.includes('인증')) {
+        errorMessage = 'Authentication failed. Please try again.';
+      } else {
+        errorMessage = `Login error: ${error}`;
+      }
+    }
+    
+    alert(errorMessage);
+    return false;
+  }
+  
+  // 로그인 성공 처리
   if (success === 'true' && accessToken) {
     try {
       // JWT 토큰에서 사용자 정보 추출
@@ -137,11 +166,16 @@ export function handleGoogleLoginCallback(): boolean {
       return true;
     } catch (error) {
       console.error('토큰 처리 실패:', error);
+      
+      // URL 파라미터 정리
+      window.history.replaceState({}, '', window.location.pathname);
+      
+      alert('Token processing failed. Please try logging in again.');
       return false;
     }
   }
   
-  console.log('로그인 성공하지 않았거나 토큰이 없음');
+  console.log('로그인 상태를 확인할 수 없음');
   return false;
 }
 
