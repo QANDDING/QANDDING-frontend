@@ -44,7 +44,7 @@ export default function BoardPage() {
       } catch (e) {
         console.error(e);
         if (e instanceof Error && e.message === 'Authentication required') {
-          alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+          console.log('Authentication required, redirecting to login');
           window.location.href = '/login';
           return;
         }
@@ -93,7 +93,7 @@ export default function BoardPage() {
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'Authentication required') {
-        alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+        console.log('Authentication required, redirecting to login');
         window.location.href = '/login';
         return;
       }

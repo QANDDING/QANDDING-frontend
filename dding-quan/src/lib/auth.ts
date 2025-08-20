@@ -122,8 +122,8 @@ export function handleGoogleLoginCallback(): boolean {
       handleGoogleLoginSuccess(accessToken, user, refreshToken || undefined);
       console.log('토큰 및 사용자 정보 저장 완료');
       
-      // URL 파라미터 정리
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // URL 파라미터 정리 (한글이 포함될 수 있는 document.title 대신 빈 문자열 사용)
+      window.history.replaceState({}, '', window.location.pathname);
       
       // 프로필 설정이 필요한 경우 온보딩 페이지로 이동
       if (needsProfile === 'true') {
@@ -162,6 +162,7 @@ export function checkAuthAndRedirect(): 'authenticated' | 'unauthenticated' {
 export function requireAuth(): boolean {
   if (!isAuthenticated()) {
     if (typeof window !== 'undefined') {
+      // ASCII 문자만 포함된 안전한 URL로 리다이렉트
       window.location.href = '/login';
     }
     return false;
@@ -172,6 +173,7 @@ export function requireAuth(): boolean {
 // 로그인 성공 후 메인 페이지로 이동
 export function redirectToMain(): void {
   if (typeof window !== 'undefined') {
+    // ASCII 문자만 포함된 안전한 URL로 리다이렉트
     window.location.href = '/';
   }
 }
@@ -180,7 +182,7 @@ export function redirectToMain(): void {
 export function logout(): void {
   clearAuth();
   if (typeof window !== 'undefined') {
-    window.location.href = 'login';
+    window.location.href = '/login';
   }
 }
 

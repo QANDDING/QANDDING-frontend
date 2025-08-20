@@ -354,7 +354,13 @@ export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
     const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
     console.log('구글 로그인 URL:', loginUrl);
-    window.location.href = loginUrl;
+    // URL이 ASCII 문자만 포함하는지 확인
+    const isValidUrl = /^[!-~\s]*$/.test(loginUrl);
+    if (isValidUrl) {
+      window.location.href = loginUrl;
+    } else {
+      console.error('Invalid URL contains non-ASCII characters:', loginUrl);
+    }
   }
 }
 
