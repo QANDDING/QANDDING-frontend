@@ -1,54 +1,98 @@
-'use client';
+'use client'
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { handleGoogleLoginCallback, redirectToMain } from '@/lib/auth';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { handleGoogleLoginCallback } from '@/lib/auth'
 
 export default function OAuthCallbackPage() {
-  const router = useRouter();
+  const router = useRouter()
+  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
+  const [message, setMessage] = useState('로그인 처리 중...')
 
   useEffect(() => {
-    console.log('=== OAuth 콜백 페이지 로드됨 ===');
-    console.log('현재 URL:', window.location.href);
+    console.log('OAuth 콜백 페이지 로드됨')
     
-    // URL 파라미터 확인
-    const urlParams = new URLSearchParams(window.location.search);
-    console.log('URL 파라미터들:', {
-      success: urlParams.get('success'),
-      needsProfile: urlParams.get('needsProfile'),
-      accessToken: urlParams.get('accessToken') ? '있음' : '없음',
-      refreshToken: urlParams.get('refreshToken') ? '있음' : '없음',
-      error: urlParams.get('error'),
-      errorType: urlParams.get('errorType')
-    });
-    
-    // 구글 로그인 콜백 처리
-    console.log('콜백 처리 시작...');
-    const callbackResult = handleGoogleLoginCallback();
-    console.log('콜백 처리 결과:', callbackResult);
-    
-    if (callbackResult) {
-      console.log('OAuth 콜백 처리 성공, 메인 페이지로 이동');
-      // 성공 시 메인 페이지로 이동
-      setTimeout(() => {
-        redirectToMain();
-      }, 1000); // 1초 후 이동 (로그 확인 시간)
-    } else {
-      console.log('OAuth 콜백 처리 실패 또는 에러, 로그인 페이지로 이동');
-      // 실패 시 로그인 페이지로 이동
-      setTimeout(() => {
-        router.push('/login');
-      }, 2000); // 2초 후 이동 (에러 확인 시간)
-    }
-  }, [router]);
+    // 약간의 지연을 두고 콜백 처리 (URL 파라미터가 완전히 로드되도록)
+    const timer = setTimeout(() => {
+      try {
+        console.log('구글 로그인 콜백 처리 시작')
+        const success = handleGoogleLoginCallback()
+        
+        if (success) {
+          console.log('로그인 성공, 메인 페이지로 이동')
+          setStatus('success')
+          setMessage('로그인 성공! 메인 페이지로 이동합니다...')
+          
+          // 성공 시 메인 페이지로 이동
+          setTimeout(() => {
+            router.replace('/')
+          }, 1500)
+        } else {
+          console.log('로그인 실패')
+          setStatus('error')
+          setMessage('로그인에 실패했습니다. 다시 시도해주세요.')
+          
+          // 실패 시 로그인 페이지로 이동
+          setTimeout(() => {
+            router.replace('/login')
+          }, 3000)
+        }
+      } catch (error) {
+        console.error('콜백 처리 중 에러:', error)
+        setStatus('error')
+        setMessage('로그인 처리 중 오류가 발생했습니다.')
+        
+        setTimeout(() => {
+          router.replace('/login')
+        }, 3000)
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Processing login...</p>
-        <p className="text-sm text-gray-400 mt-2">Please wait while we complete your authentication.</p>
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
+        <div className="mb-6">
+          {status === 'processing' && (
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          )}
+          
+          {status === 'success' && (
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          )}
+          
+          {status === 'error' && (
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+          )}
+        </div>
+        
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          {status === 'processing' && '로그인 처리 중'}
+          {status === 'success' && '로그인 성공!'}
+          {status === 'error' && '로그인 실패'}
+        </h2>
+        
+        <p className="text-gray-600">{message}</p>
+        
+        {status === 'error' && (
+          <button
+            onClick={() => router.push('/login')}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+          >
+            로그인 페이지로 돌아가기
+          </button>
+        )}
       </div>
     </div>
-  );
-} 
+  )
+}
