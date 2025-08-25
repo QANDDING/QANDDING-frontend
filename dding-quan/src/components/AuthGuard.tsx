@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated, checkAuthAndRedirect } from '@/lib/auth';
+import { isAuthenticated, checkAuthAndRedirect, handleTokenExpired } from '@/lib/auth';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -16,17 +16,25 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // 인증 상태 확인
-      const authStatus = checkAuthAndRedirect();
-      
-      if (authStatus === 'authenticated') {
-        setIsAuth(true);
-      } else {
-        // 인증되지 않은 경우 로그인 페이지로 이동
-        router.push('/login');
+      try {
+        // 인증 상태 확인
+        const authStatus = checkAuthAndRedirect();
+        
+        if (authStatus === 'authenticated') {
+          setIsAuth(true);
+        } else {
+          // 인증되지 않은 경우 로그인 페이지로 이동
+          setIsAuth(false);
+          router.push('/login');
+        }
+      } catch (error) {
+        console.error('인증 확인 중 에러:', error);
+        // 에러 발생 시 토큰 정리 및 로그인 페이지로 이동
+        handleTokenExpired();
+        setIsAuth(false);
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
 
     checkAuth();

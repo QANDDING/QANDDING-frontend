@@ -8,7 +8,7 @@ import {
   User,
   Professor,
 } from '../types/types'
-import { getAccessToken, removeAccessToken } from './auth';
+import { getAccessToken, removeAccessToken, handleTokenExpired } from './auth';
 
 // API 기본 설정
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
@@ -28,11 +28,51 @@ const getToken = (): string | null => {
   return token;
 };
 
+// 인증 에러 처리 유틸리티
+const handleAuthError = (response: Response): void => {
+  if (response.status === 401) {
+    console.log('토큰이 만료되었거나 무효합니다.');
+    handleTokenExpired();
+  }
+};
+
+// 공통 fetch 래퍼 함수
+const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Authentication required');
+  }
+
+  // 기본 헤더 설정
+  const defaultHeaders: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+
+  // FormData인 경우 Content-Type 제거 (브라우저가 자동 설정)
+  if (options.body instanceof FormData) {
+    delete defaultHeaders['Content-Type'];
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers,
+    },
+  });
+
+  // 401 에러 처리
+  if (response.status === 401) {
+    handleAuthError(response);
+    throw new Error('Authentication failed');
+  }
+
+  return response;
+};
+
 // 질문 관련 API
 export async function fetchQuestions(params: QuestionListParams = {}): Promise<PaginatedResponse<Question>> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
   const searchParams = new URLSearchParams();
   if (params.page !== undefined) searchParams.append('page', params.page.toString());
   if (params.size !== undefined) searchParams.append('size', params.size.toString());
@@ -44,13 +84,7 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   
   console.log('질문 목록 API 호출:', url);
   
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  const response = await authenticatedFetch(url, { method: 'GET' });
 
   console.log('질문 목록 API 응답:', response.status, response.statusText);
 
@@ -66,15 +100,8 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
 }
 
 export async function fetchQuestion(id: string): Promise<Question> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
-  const response = await fetch(`${BASE_URL}/api/questions/${id}`, {
+  const response = await authenticatedFetch(`${BASE_URL}/api/questions/${id}`, {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
   });
 
   if (!response.ok) {
@@ -86,9 +113,6 @@ export async function fetchQuestion(id: string): Promise<Question> {
 }
 
 export async function createQuestion(questionData: CreateQuestionRequest): Promise<Question> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
   const formData = new FormData();
   formData.append('title', questionData.title);
   formData.append('content', questionData.content);
@@ -103,11 +127,8 @@ export async function createQuestion(questionData: CreateQuestionRequest): Promi
     });
   }
 
-  const response = await fetch(`${BASE_URL}/api/questions`, {
+  const response = await authenticatedFetch(`${BASE_URL}/api/questions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
     body: formData,
   });
 
@@ -250,25 +271,12 @@ export async function fetchProfessorsBySubject(subjectId: number): Promise<Profe
 
 // 사용자 관련 API
 export async function fetchUserProfile(): Promise<User> {
-  const token = getToken();
-  if (!token) {
-    console.log('사용자 프로필 조회 실패: 토큰 없음');
-    throw new Error('Authentication required');
-  }
-
-  const response = await fetch(`${BASE_URL}/api/users/me`, {
+  const response = await authenticatedFetch(`${BASE_URL}/api/users/me`, {
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
   });
 
   if (!response.ok) {
     console.log(`사용자 프로필 조회 실패: ${response.status} ${response.statusText}`);
-    if (response.status === 401) {
-      console.log('토큰이 만료되었거나 무효함');
-    }
     throw new Error(`Failed to fetch user profile: ${response.status}`);
   }
 

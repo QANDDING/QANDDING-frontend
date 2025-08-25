@@ -61,6 +61,21 @@ export function clearAuth(): void {
   s.removeItem(AUTH_TIME_KEY);
   s.removeItem(ACCESS_TOKEN_KEY);
   s.removeItem('REFRESH_TOKEN');
+  console.log('인증 정보가 모두 정리되었습니다.');
+}
+
+// 토큰 만료 시 자동 로그아웃 및 로그인 페이지 리다이렉트
+export function handleTokenExpired(): void {
+  console.log('토큰이 만료되었습니다. 로그아웃 처리 중...');
+  clearAuth();
+  
+  if (typeof window !== 'undefined') {
+    // 현재 페이지가 로그인 페이지가 아닌 경우에만 리다이렉트
+    if (!window.location.pathname.includes('/login')) {
+      alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+      window.location.href = '/login';
+    }
+  }
 }
 
 export function isAuthenticated(): boolean {
