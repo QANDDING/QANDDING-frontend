@@ -97,7 +97,7 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   if (params.professorId) searchParams.append('professorId', params.professorId.toString());
 
   const queryString = searchParams.toString();
-  const url = `${BASE_URL}/api/questions${queryString ? `?${queryString}` : ''}`;
+  const url = `${BASE_URL}/api/questions`;
   
   console.log('질문 목록 API 호출:', url);
   
@@ -116,7 +116,7 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   return data;
 }
 
-export async function fetchQuestion(id: string): Promise<Question> {
+export async function fetchDetailQuestion(id: string): Promise<Question> {
   const response = await authenticatedFetch(`${BASE_URL}/api/questions/${id}`, {
     method: 'GET',
   });
@@ -175,11 +175,11 @@ export async function deleteQuestion(id: string): Promise<void> {
 }
 
 // 답변 관련 API
-export async function fetchAnswers(questionId: string): Promise<Answer[]> {
+export async function fetchAnswers(questionId: number): Promise<Answer[]> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/answers/combined?questionPostId=${questionId}`, {
+  const response = await fetch(`${BASE_URL}/api/user-answers/${questionId}`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -211,7 +211,7 @@ export async function createAnswer(answerData: CreateAnswerRequest & { title?: s
     });
   }
 
-  const response = await fetch(`${BASE_URL}/api/user-answers?questionPostId=${answerData.questionId}`, {
+  const response = await fetch(`${BASE_URL}/api/user-answers`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -227,11 +227,11 @@ export async function createAnswer(answerData: CreateAnswerRequest & { title?: s
   return data;
 }
 
-export async function adoptAnswer(answerId: string): Promise<void> {
+export async function adoptAnswer(): Promise<void> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/answers/selection?answerPostId=${answerId}`, {
+  const response = await fetch(`${BASE_URL}/api/answers/selection`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -245,11 +245,11 @@ export async function adoptAnswer(answerId: string): Promise<void> {
 }
 
 // 과목 관련 API
-export async function fetchSubjects(query: string): Promise<Array<{ id: number; name: string }>> {
+export async function fetchSubjects(): Promise<Array<{ id: number; name: string }>> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/subjects/search?query=${encodeURIComponent(query)}`, {
+  const response = await fetch(`${BASE_URL}/api/subjects/search`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -266,12 +266,12 @@ export async function fetchSubjects(query: string): Promise<Array<{ id: number; 
 }
 
 // 교수 관련 API
-export async function fetchProfessorsBySubject(subjectId: number): Promise<Professor[]> {
+export async function fetchProfessorsBySubject(): Promise<Professor[]> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/professors/by-subject?subjectId=${subjectId}`, {
-    method: 'GET',
+  const response = await fetch(`${BASE_URL}/api/professors/by-subject`, {
+    method: 'GET',  
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -386,7 +386,7 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
+    const loginUrl = `${BASE_URL}/login`;
     // 개발 환경에서만 상세 로그 출력
     if (process.env.NODE_ENV === 'development') {
       console.log('구글 로그인 시작:', {
@@ -452,7 +452,6 @@ export function startGoogleLogin(): void {
 // 기존 코드와의 호환성을 위한 객체 형태 API
 export const questionApi = {
   getList: fetchQuestions,
-  getById: fetchQuestion,
   create: createQuestion,
   delete: deleteQuestion,
 };
