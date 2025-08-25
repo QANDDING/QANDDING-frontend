@@ -98,7 +98,7 @@ export default function LoginPage() {
             }}
             className='w-full px-4 py-2 text-sm bg-blue-100 border rounded-md hover:bg-blue-200 text-blue-700'
           >
-            🔄 토큰 갱신 시도
+            토큰 갱신 
           </button>
         </div>
         <div className='pt-2 text-center'>
