@@ -3,23 +3,38 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { userApi, startGoogleLogin } from '../../lib/api';
-import { saveAuthUser } from '@/lib/auth';
+import { saveAuthUser, isAuthenticated, redirectToMain } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('로그인 페이지 로드됨');
+    
+    // 이미 인증된 상태라면 메인 페이지로 이동
+    if (isAuthenticated()) {
+      console.log('이미 인증된 사용자, 메인 페이지로 이동');
+      redirectToMain();
+      return;
+    }
+
+    // OAuth 콜백은 /oauth/callback 페이지에서 처리됨
+
     // 로그인된 세션이 이미 있으면 메인으로 이동
     (async () => {
       try {
+        console.log('기존 세션 확인 중...');
         const me = await userApi.getProfile();
         if (me && me.id) {
+          console.log('기존 세션 발견, 사용자 정보 저장');
           saveAuthUser(me);
           // 로그인 성공 시 바로 메인 페이지로 이동
           router.replace('/');
         }
-      } catch {}
+      } catch (error) {
+        console.log('기존 세션 없음 또는 에러:', error);
+      }
     })();
   }, [router]);
 

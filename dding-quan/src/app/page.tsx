@@ -1,6 +1,23 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { isAuthenticated } from '@/lib/auth';
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // 인증 상태 확인
+    if (isAuthenticated()) {
+      // 이미 인증된 상태라면 페이지 유지
+      return;
+    } else {
+      // 토큰이 없으면 로그인 페이지로 이동
+      router.push('/login');
+    }
+  }, [router]);
   return (
     <main className='mx-auto max-w-5xl px-6 py-10'>
       <p className='text-sm text-gray-600 mb-6'>궁금한 건 무엇이든 질문해보세요!</p>

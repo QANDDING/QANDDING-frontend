@@ -1,23 +1,26 @@
 import {
   Question,
   CreateQuestionRequest,
-  UpdateQuestionRequest,
   Answer,
   CreateAnswerRequest,
   PaginatedResponse,
   QuestionListParams,
-  FileUploadResponse,
   User,
   Professor,
 } from '../types/types'
+import { getAccessToken, removeAccessToken } from './auth';
 
 // API 기본 설정
-const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL || 'https://qandding.store';
+const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
+console.log('API BASE_URL:', BASE_URL);
+
+
 
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('ACCESS_TOKEN');
+  const token = getAccessToken();
+  console.log('API 호출용 토큰 조회:', token ? '토큰 있음' : '토큰 없음');
+  return token;
 };
 
 // 질문 관련 API
@@ -32,7 +35,11 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   if (params.professorId) searchParams.append('professorId', params.professorId.toString());
 
   const queryString = searchParams.toString();
-  const response = await fetch(`${BASE_URL}/api/questions${queryString ? `?${queryString}` : ''}`, {
+  const url = `${BASE_URL}/api/questions${queryString ? `?${queryString}` : ''}`;
+  
+  console.log('질문 목록 API 호출:', url);
+  
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       Cookie: `ACCESS_TOKEN=${token}`,
@@ -40,11 +47,16 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
     credentials: 'include',
   });
 
+  console.log('질문 목록 API 응답:', response.status, response.statusText);
+
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('질문 목록 API 에러:', response.status, errorText);
     throw new Error(`Failed to fetch questions: ${response.status}`);
   }
 
   const data = await response.json();
+  console.log('질문 목록 데이터:', data);
   return data;
 }
 
@@ -312,7 +324,7 @@ export async function logout(): Promise<void> {
     credentials: 'include',
   });
 
-  localStorage.removeItem('ACCESS_TOKEN');
+  removeAccessToken();
   
   if (!response.ok) {
     console.warn('Logout request failed, but token was removed locally');
@@ -340,7 +352,21 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    window.location.href = `${BASE_URL}/login/oauth2/code/google`;
+    const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
+    console.log('구글 로그인 시작:', {
+      currentUrl: window.location.href,
+      userAgent: navigator.userAgent
+    });
+    
+    // URL이 ASCII 문자만 포함하는지 확인
+    const isValidUrl = /^[!-~\s]*$/.test(loginUrl);
+    if (isValidUrl) {
+      console.log('구글 OAuth2 페이지로 리다이렉트 중...');
+      window.location.href = loginUrl;
+    } else {
+      console.error('Invalid URL contains non-ASCII characters:', loginUrl);
+      alert('Login URL is invalid. Please contact support.');
+    }
   }
 }
 

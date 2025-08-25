@@ -1,8 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import { questionApi } from '@/lib/api';
+import { isAuthenticated } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 type HistoryItem = {
   id: string;
@@ -17,19 +19,21 @@ type HistoryItem = {
 
 const PAGE_SIZE = 10;
 
-export default function HistoryPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ page?: string }>;
-}) {
+export default function HistoryPage() {
+  const router = useRouter();
   const [data, setData] = useState<{ items: HistoryItem[]; total: number }>({ items: [], total: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [subjects, setSubjects] = useState<string[]>([]);
-  const resolvedParams = searchParams ? use(searchParams) : { page: '1' };
-  const page = Math.max(1, Number(resolvedParams?.page || 1));
+  const [page] = useState(1);
 
   useEffect(() => {
+    // 인증 상태 확인
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+
     let mounted = true;
     (async () => {
       try {
@@ -41,7 +45,7 @@ export default function HistoryPage({
           items: (result.content || []) as unknown as HistoryItem[], 
           total: result.totalElements || 0 
         });
-        const uniqueSubjects = Array.from(new Set((result.content || []).map((i: any) => i.subject)));
+        const uniqueSubjects = Array.from(new Set((result.content || []).map((i: { subject: string }) => i.subject)));
         setSubjects(uniqueSubjects);
       } catch (e) {
         console.error(e);
@@ -50,7 +54,7 @@ export default function HistoryPage({
     return () => {
       mounted = false;
     };
-  }, [page]);
+  }, [page, router]);
 
  
 
@@ -182,8 +186,8 @@ export default function HistoryPage({
                         </p>
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="px-2 py-1 bg-gray-100 rounded-full">{item.subject}</span>
-                          {('professorName' in item) && (item as any).professorName && (
-                            <span className="px-2 py-1 bg-gray-100 rounded-full">{(item as any).professorName}</span>
+                          {('professorName' in item) && (item as { professorName?: string }).professorName && (
+                            <span className="px-2 py-1 bg-gray-100 rounded-full">{(item as { professorName?: string }).professorName}</span>
                           )}
                           <span>질문 #{item.id}</span>
                           {item.createdAt && (

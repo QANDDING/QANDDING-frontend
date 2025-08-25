@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { questionApi, professorApi, subjectsApi } from '@/lib/api';
+import { isAuthenticated } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 type BoardItem = {
   id: string;
@@ -16,6 +18,7 @@ type BoardItem = {
   type Professor = import('@/types/types').Professor;
 
 export default function BoardPage() {
+  const router = useRouter();
   const [data, setData] = useState<{ items: BoardItem[] }>({ items: [] });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -25,6 +28,12 @@ export default function BoardPage() {
   const [isLoadingProf, setIsLoadingProf] = useState(false);
 
   useEffect(() => {
+    // 인증 상태 확인
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+
     let mounted = true;
     (async () => {
       try {
@@ -35,7 +44,7 @@ export default function BoardPage() {
       } catch (e) {
         console.error(e);
         if (e instanceof Error && e.message === 'Authentication required') {
-          alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+          console.log('Authentication required, redirecting to login');
           window.location.href = '/login';
           return;
         }
@@ -44,7 +53,7 @@ export default function BoardPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [router]);
 
   const categories = [
     { id: 'all', name: '전체' },
@@ -64,7 +73,6 @@ export default function BoardPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const normalizedSubject = subjectInput.trim();
   const filteredProfessors = professors;
   const selectedProfessor = professors.find((p) => p.id.toString() === selectedProfessorId) || null;
 
@@ -85,7 +93,7 @@ export default function BoardPage() {
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'Authentication required') {
-        alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+        console.log('Authentication required, redirecting to login');
         window.location.href = '/login';
         return;
       }
@@ -241,7 +249,7 @@ export default function BoardPage() {
             </div>
           ) : (
             <ul className="divide-y divide-gray-200">
-              {filteredItems.map((item: BoardItem, index: number) => (
+              {filteredItems.map((item: BoardItem) => (
                 <li key={item.id} className="hover:bg-gray-50 transition-colors">
                   <Link href={`/board/${item.id}`} className="block p-6">
                     <div className="flex items-start justify-between">

@@ -208,14 +208,14 @@ export interface RegisterRequest {
 }
 
 // 공통 응답 래퍼
-export interface BaseResponse<T = any> {
+export interface BaseResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   timestamp: string;
 }

@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { questionApi, professorApi, aiApi, subjectsApi } from '@/lib/api';
+import { isAuthenticated } from '@/lib/auth';
 
-export default function AskPage() {
+function AskPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [initialQuestion, setInitialQuestion] = useState<string>('');
   const [stage, setStage] = useState<'quick' | 'detail'>('quick');
   const [subject, setSubject] = useState('');
@@ -21,7 +24,6 @@ export default function AskPage() {
     setStage('detail');
   }
 
-  const router = useRouter();
   const [selectedFiles, setSelectedFiles] = useState<{ pdf?: File; image?: File }>({});
   const [aiLoading, setAiLoading] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -32,7 +34,7 @@ export default function AskPage() {
   async function handleDetailSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const formSubject = String(formData.get('subject') || '').trim();
+
     const files: File[] = [];
     if (selectedFiles.pdf) files.push(selectedFiles.pdf);
     if (selectedFiles.image) files.push(selectedFiles.image);
@@ -63,8 +65,31 @@ export default function AskPage() {
   }
 
   useEffect(() => {
-    setSubject('');
-  }, []);
+    // 인증 상태 확인
+    if (!isAuthenticated()) {
+      router.push('/login');
+      return;
+    }
+
+    // URL 파라미터에서 AI가 생성한 내용이 있다면 설정
+    const title = searchParams.get('title');
+    const content = searchParams.get('content');
+    const subjectParam = searchParams.get('subject');
+    const fromAi = searchParams.get('fromAi');
+    
+    if (title && titleInputRef.current) {
+      titleInputRef.current.value = title;
+    }
+    if (content && contentTextareaRef.current) {
+      contentTextareaRef.current.value = content;
+    }
+    if (subjectParam) {
+      setSubject(subjectParam);
+    }
+    if (fromAi === 'true') {
+      setStage('detail');
+    }
+  }, [searchParams, router]);
 
   async function handleSearchProfessors() {
     if (!selectedSubjectId) {
@@ -74,7 +99,7 @@ export default function AskPage() {
     setLoadingProf(true);
     try {
       const list = await professorApi.getBySubjectId(selectedSubjectId);
-      setProfessors(list.map((p: any) => ({ id: p.id.toString(), name: p.name })));
+      setProfessors(list.map((p: { id: number; name: string }) => ({ id: p.id.toString(), name: p.name })));
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'Authentication required') {
@@ -95,15 +120,24 @@ export default function AskPage() {
       return;
     }
     try {
+      console.log('과목 검색 시작:', keyword);
       const suggestions = await subjectsApi.search(keyword);
+      console.log('과목 검색 성공:', suggestions);
       setSubjectSuggestions(suggestions);
     } catch (e) {
-      console.error(e);
+      console.error('과목 검색 에러:', e);
       if (e instanceof Error && e.message === 'Authentication required') {
-        alert('로그인이 필요합니다. 로그인 페이지로 이동합니다.');
+        console.log('Authentication required, redirecting to login');
         window.location.href = '/login';
         return;
       }
+      
+      // 500 에러인 경우 사용자에게 알림
+      if (e instanceof Error && e.message.includes('500')) {
+        console.error('서버 내부 에러 발생:', e.message);
+        alert('Subject search failed due to server error. Please try again later.');
+      }
+      
       setSubjectSuggestions([]);
     }
   }
@@ -137,6 +171,25 @@ export default function AskPage() {
               className='w-full bg-transparent outline-none'
               placeholder='키워드나 질문을 입력하고 Enter'
             />
+          </div>
+          <div className='flex gap-2 mt-3'>
+            <button
+              type='button'
+              onClick={() => {
+                const question = (document.querySelector('input[name="q"]') as HTMLInputElement)?.value || '';
+                if (question.trim()) {
+                  const params = new URLSearchParams({
+                    question: question.trim()
+                  });
+                  router.push(`/aianswer?${params.toString()}`);
+                } else {
+                  alert('먼저 질문을 입력해주세요.');
+                }
+              }}
+              className='px-4 py-2 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors'
+            >
+              AI 답변 받기
+            </button>
           </div>
         </form>
       </div>
@@ -315,7 +368,7 @@ export default function AskPage() {
                     if (res.content && contentTextareaRef.current) {
                       contentTextareaRef.current.value = res.content;
                     }
-                  } catch (e) {
+                  } catch {
                     alert('AI 제안에 실패했습니다.');
                   } finally {
                     setAiLoading(false);
@@ -326,11 +379,38 @@ export default function AskPage() {
               >
                 {aiLoading ? 'AI 작성 중...' : 'AI 질문하기'}
               </button>
+              <button
+                type='button'
+                onClick={() => {
+                  const contentValue = contentTextareaRef.current?.value || '';
+                  const params = new URLSearchParams({
+                    question: contentValue,
+                    subject: subject
+                  });
+                  router.push(`/aianswer?${params.toString()}`);
+                }}
+                className='px-4 py-2 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors'
+                disabled={!subject.trim()}
+              >
+                AI 답변 받기
+              </button>
             </div>
           </div>
         </form>
       </div>
     </main>
+  );
+}
+
+export default function AskPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <AskPageContent />
+    </Suspense>
   );
 }
 
