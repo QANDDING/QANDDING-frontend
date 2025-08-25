@@ -19,7 +19,9 @@ console.log('API BASE_URL:', BASE_URL);
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
   const token = getAccessToken();
-  console.log('API 호출용 토큰 조회:', token ? '토큰 있음' : '토큰 없음');
+  if (!token) {
+    console.log('API 호출용 토큰 없음 - 인증 필요');
+  }
   return token;
 };
 
@@ -248,7 +250,10 @@ export async function fetchProfessorsBySubject(subjectId: number): Promise<Profe
 // 사용자 관련 API
 export async function fetchUserProfile(): Promise<User> {
   const token = getToken();
-  if (!token) throw new Error('Authentication required');
+  if (!token) {
+    console.log('사용자 프로필 조회 실패: 토큰 없음');
+    throw new Error('Authentication required');
+  }
 
   const response = await fetch(`${BASE_URL}/api/users/me`, {
     method: 'GET',
@@ -259,10 +264,15 @@ export async function fetchUserProfile(): Promise<User> {
   });
 
   if (!response.ok) {
+    console.log(`사용자 프로필 조회 실패: ${response.status} ${response.statusText}`);
+    if (response.status === 401) {
+      console.log('토큰이 만료되었거나 무효함');
+    }
     throw new Error(`Failed to fetch user profile: ${response.status}`);
   }
 
   const data = await response.json();
+  console.log('사용자 프로필 조회 성공');
   return data;
 }
 

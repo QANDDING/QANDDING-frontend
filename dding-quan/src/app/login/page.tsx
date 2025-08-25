@@ -19,23 +19,32 @@ export default function LoginPage() {
       return;
     }
 
-    // OAuth 콜백은 /oauth/callback 페이지에서 처리됨
-
-    // 로그인된 세션이 이미 있으면 메인으로 이동
-    (async () => {
-      try {
-        console.log('기존 세션 확인 중...');
-        const me = await userApi.getProfile();
-        if (me && me.id) {
-          console.log('기존 세션 발견, 사용자 정보 저장');
-          saveAuthUser(me);
-          // 로그인 성공 시 바로 메인 페이지로 이동
-          router.replace('/');
+    // 토큰이 있는 경우에만 기존 세션 확인
+    // 토큰이 없으면 굳이 API 호출하지 않음
+    const token = localStorage.getItem('ACCESS_TOKEN');
+    if (token) {
+      (async () => {
+        try {
+          console.log('기존 세션 확인 중...');
+          const me = await userApi.getProfile();
+          if (me && me.id) {
+            console.log('기존 세션 발견, 사용자 정보 저장');
+            saveAuthUser(me);
+            // 로그인 성공 시 바로 메인 페이지로 이동
+            router.replace('/');
+          }
+        } catch (error) {
+          console.log('기존 세션 만료 또는 무효:', error);
+          // 토큰이 무효한 경우 제거
+          localStorage.removeItem('ACCESS_TOKEN');
+          localStorage.removeItem('REFRESH_TOKEN');
+          localStorage.removeItem('dq_auth_user_v1');
+          localStorage.removeItem('dq_auth_time_v1');
         }
-      } catch (error) {
-        console.log('기존 세션 없음 또는 에러:', error);
-      }
-    })();
+      })();
+    } else {
+      console.log('저장된 토큰이 없어 로그인이 필요합니다.');
+    }
   }, [router]);
 
   return (
