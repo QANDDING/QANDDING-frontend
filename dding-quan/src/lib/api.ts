@@ -8,7 +8,7 @@ import {
   User,
   Professor,
 } from '../types/types'
-import { getAccessToken, removeAccessToken, handleTokenExpired } from './auth';
+import { getAccessToken, removeAccessToken, handleTokenExpired, refreshAccessToken } from './auth';
 
 // API 기본 설정
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
@@ -36,8 +36,8 @@ const handleAuthError = (response: Response): void => {
   }
 };
 
-// 공통 fetch 래퍼 함수
-const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+// 공통 fetch 래퍼 함수 (자동 토큰 갱신 포함)
+const authenticatedFetch = async (url: string, options: RequestInit = {}, isRetry = false): Promise<Response> => {
   const token = getToken();
   if (!token) {
     throw new Error('Authentication required');
@@ -62,8 +62,25 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}): Promi
     },
   });
 
-  // 401 에러 처리
-  if (response.status === 401) {
+  // 401 에러 처리 - 리프레시 토큰으로 재시도
+  if (response.status === 401 && !isRetry) {
+    console.log('401 에러 발생, 리프레시 토큰으로 재시도...');
+    
+    const refreshSuccess = await refreshAccessToken();
+    if (refreshSuccess) {
+      console.log('토큰 갱신 성공, API 재호출');
+      // 토큰 갱신 성공 시 같은 요청을 다시 시도 (무한 루프 방지를 위해 isRetry = true)
+      return authenticatedFetch(url, options, true);
+    } else {
+      console.log('토큰 갱신 실패, 로그아웃 처리');
+      handleAuthError(response);
+      throw new Error('Authentication failed');
+    }
+  }
+
+  // 두 번째 시도에서도 401이면 완전히 실패
+  if (response.status === 401 && isRetry) {
+    console.log('토큰 갱신 후에도 401 에러, 완전한 인증 실패');
     handleAuthError(response);
     throw new Error('Authentication failed');
   }
