@@ -3,48 +3,40 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { userApi, startGoogleLogin } from '../../lib/api';
-import { saveAuthUser, isAuthenticated, redirectToMain } from '@/lib/auth';
+import { saveAuthUser, isAuthenticated, isAuthenticatedWithServer, redirectToMain } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('로그인 페이지 로드됨');
-    
-    // 이미 인증된 상태라면 메인 페이지로 이동
-    if (isAuthenticated()) {
-      console.log('이미 인증된 사용자, 메인 페이지로 이동');
-      redirectToMain();
-      return;
-    }
+    const checkExistingAuth = async () => {
+      console.log('로그인 페이지 로드됨');
+      
+      // 로컬 토큰이 없으면 바로 로그인 대기
+      if (!isAuthenticated()) {
+        console.log('저장된 토큰이 없어 로그인이 필요합니다.');
+        return;
+      }
 
-    // 토큰이 있는 경우에만 기존 세션 확인
-    // 토큰이 없으면 굳이 API 호출하지 않음
-    const token = localStorage.getItem('ACCESS_TOKEN');
-    if (token) {
-      (async () => {
-        try {
-          console.log('기존 세션 확인 중...');
-          const me = await userApi.getProfile();
-          if (me && me.id) {
-            console.log('기존 세션 발견, 사용자 정보 저장');
-            saveAuthUser(me);
-            // 로그인 성공 시 바로 메인 페이지로 이동
-            router.replace('/');
-          }
-        } catch (error) {
-          console.log('기존 세션 만료 또는 무효:', error);
-          // 토큰이 무효한 경우 제거
-          localStorage.removeItem('ACCESS_TOKEN');
-          localStorage.removeItem('REFRESH_TOKEN');
-          localStorage.removeItem('dq_auth_user_v1');
-          localStorage.removeItem('dq_auth_time_v1');
+      try {
+        console.log('기존 세션 서버 검증 중...');
+        const serverAuth = await isAuthenticatedWithServer();
+        
+        if (serverAuth) {
+          console.log('기존 세션 유효 확인됨, 메인 페이지로 이동');
+          redirectToMain();
+        } else {
+          console.log('기존 세션 만료됨, 로그인 필요');
+          // isAuthenticatedWithServer에서 이미 토큰 정리됨
         }
-      })();
-    } else {
-      console.log('저장된 토큰이 없어 로그인이 필요합니다.');
-    }
+      } catch (error) {
+        console.log('기존 세션 확인 중 에러:', error);
+        // 에러 발생 시에는 로그인 대기 상태 유지
+      }
+    };
+
+    checkExistingAuth();
   }, [router]);
 
   return (

@@ -82,6 +82,38 @@ export function isAuthenticated(): boolean {
   return getAuthUser() !== null && getAccessToken() !== null;
 }
 
+// 서버에서 토큰 유효성을 실제로 검증하는 함수
+export async function isAuthenticatedWithServer(): Promise<boolean> {
+  const localAuth = isAuthenticated();
+  if (!localAuth) {
+    return false;
+  }
+
+  try {
+    // 서버에 토큰 유효성 검사 요청
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/check`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAccessToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.status === 401) {
+      // 토큰이 만료된 경우 로컬 정보 정리
+      console.log('서버에서 토큰 만료 확인됨, 로컬 인증 정보 정리');
+      handleTokenExpired();
+      return false;
+    }
+
+    return response.ok;
+  } catch (error) {
+    console.error('서버 인증 확인 중 에러:', error);
+    // 네트워크 에러 등의 경우 로컬 토큰이 있으면 일단 인증된 것으로 처리
+    return localAuth;
+  }
+}
+
 // 토큰 관련 함수들
 export function saveAccessToken(token: string): void {
   const s = safeStorage();
