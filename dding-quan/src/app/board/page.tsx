@@ -81,12 +81,18 @@ export default function BoardPage() {
     setSelectedProfessorId('');
     setIsLoadingProf(true);
     try {
-      // 먼저 과목 검색 후 과목 ID를 얻어야 함
-      const subjects = await subjectsApi.search(keyword);
-      if (subjects.length > 0) {
-        const firstSubject = subjects[0];
-        const list = await professorApi.getBySubjectId(firstSubject.id);
-        setProfessors(list);
+      // 모든 과목과 교수를 가져온 후 필터링
+      const allSubjects = await subjectsApi.search();
+      const filteredSubjects = allSubjects.filter((s: { name: string }) => 
+        s.name.toLowerCase().includes(keyword.toLowerCase())
+      );
+      
+      if (filteredSubjects.length > 0) {
+        const firstSubject = filteredSubjects[0];
+        const allProfessors = await professorApi.getBySubjectId();
+        // 선택된 과목에 해당하는 교수들만 필터링
+        const filteredProfessors = allProfessors.filter((p: { id: number; name: string; subjectId?: number }) => p.subjectId == firstSubject.id);
+        setProfessors(filteredProfessors);
       } else {
         setProfessors([]);
       }

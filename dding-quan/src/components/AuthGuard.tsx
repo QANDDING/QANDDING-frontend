@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated, checkAuthAndRedirect } from '@/lib/auth';
+import { isAuthenticated, isAuthenticatedWithServer, handleTokenExpired } from '@/lib/auth';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -16,17 +16,35 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // 인증 상태 확인
-      const authStatus = checkAuthAndRedirect();
-      
-      if (authStatus === 'authenticated') {
-        setIsAuth(true);
-      } else {
-        // 인증되지 않은 경우 로그인 페이지로 이동
-        router.push('/login');
+      try {
+        // 1단계: 로컬 인증 상태 확인
+        if (!isAuthenticated()) {
+          console.log('로컬 인증 정보 없음 - 로그인 페이지로 이동');
+          setIsAuth(false);
+          router.push('/login');
+          return;
+        }
+
+        // 2단계: 서버에서 토큰 유효성 검증
+        console.log('서버에서 토큰 유효성 검증 중...');
+        const serverAuth = await isAuthenticatedWithServer();
+        
+        if (serverAuth) {
+          console.log('서버 인증 확인 완료');
+          setIsAuth(true);
+        } else {
+          console.log('서버에서 토큰 무효 확인됨 - 로그인 페이지로 이동');
+          setIsAuth(false);
+          // isAuthenticatedWithServer에서 이미 토큰 정리 및 리다이렉트 처리됨
+        }
+      } catch (error) {
+        console.error('인증 확인 중 에러:', error);
+        // 에러 발생 시 토큰 정리 및 로그인 페이지로 이동
+        handleTokenExpired();
+        setIsAuth(false);
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     };
 
     checkAuth();

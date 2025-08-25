@@ -98,8 +98,10 @@ function AskPageContent() {
     }
     setLoadingProf(true);
     try {
-      const list = await professorApi.getBySubjectId(selectedSubjectId);
-      setProfessors(list.map((p: { id: number; name: string }) => ({ id: p.id.toString(), name: p.name })));
+      const list = await professorApi.getBySubjectId();
+      
+      const filteredList = list.filter((p: { id: number; name: string; subjectId?: number }) => p.subjectId == selectedSubjectId);
+      setProfessors(filteredList.map((p: { id: number; name: string }) => ({ id: p.id.toString(), name: p.name })));
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'Authentication required') {
@@ -121,7 +123,11 @@ function AskPageContent() {
     }
     try {
       console.log('과목 검색 시작:', keyword);
-      const suggestions = await subjectsApi.search(keyword);
+      const allSubjects = await subjectsApi.search();
+      // 키워드로 필터링
+      const suggestions = allSubjects.filter((s: { name: string }) => 
+        s.name.toLowerCase().includes(keyword.toLowerCase())
+      );
       console.log('과목 검색 성공:', suggestions);
       setSubjectSuggestions(suggestions);
     } catch (e) {
