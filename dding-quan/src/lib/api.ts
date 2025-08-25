@@ -326,16 +326,9 @@ export async function completeUserProfile(profileData: { nickname: string; grade
 
 // AI 관련 API
 export async function generateAIResponse(prompt: Record<string, string>): Promise<Record<string, string>> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
   const response = await authenticatedFetch(`${BASE_URL}/api/ai/generate`, {
     method: 'POST',
     body: JSON.stringify(prompt),
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
   });
 
   if (!response.ok) {
@@ -368,22 +361,21 @@ export async function logout(): Promise<void> {
 
 // 리프레시 토큰으로 액세스 토큰 갱신
 export async function refreshAccessToken(): Promise<boolean> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
   const refreshToken = localStorage.getItem('REFRESH_TOKEN');
+
   if (!refreshToken) {
     console.log('리프레시 토큰이 없습니다.');
     return false;
   }
 
   try {
+    // 리프레시 토큰만 사용 (만료된 액세스 토큰 사용하지 않음)
     const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
+     headers: {
+      'Authorization': `Bearer ${refreshToken}`,
+      'Content-Type': 'application/json',
+    },
       body: JSON.stringify({ refreshToken }),
     });
 
@@ -416,7 +408,7 @@ export async function checkAuth(): Promise<boolean> {
   if (!token) return false;
 
   try {
-    const response = await authenticatedFetch(`${BASE_URL}/api/auth/check`, {
+    const response = await authenticatedFetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
