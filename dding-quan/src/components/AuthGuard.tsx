@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isAuthenticated, isAuthenticatedWithServer, checkAuthAndRedirect, handleTokenExpired } from '@/lib/auth';
+import { isAuthenticated, isAuthenticatedWithServer, handleTokenExpired } from '@/lib/auth';
 
 interface AuthGuardProps {
   children: React.ReactNode;

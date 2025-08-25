@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { userApi, startGoogleLogin } from '../../lib/api';
-import { saveAuthUser, isAuthenticated, isAuthenticatedWithServer, redirectToMain, refreshAccessToken } from '@/lib/auth';
+import { startGoogleLogin } from '../../lib/api';
+import { isAuthenticated, isAuthenticatedWithServer, redirectToMain } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
