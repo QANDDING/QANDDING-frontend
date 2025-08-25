@@ -82,55 +82,7 @@ export function isAuthenticated(): boolean {
   return getAuthUser() !== null && getAccessToken() !== null;
 }
 
-// 리프레시 토큰으로 액세스 토큰 갱신
-export async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = localStorage.getItem('REFRESH_TOKEN');
-  if (!refreshToken) {
-    console.log('리프레시 토큰이 없습니다.');
-    return false;
-  }
-
-  try {
-    console.log('리프레시 토큰으로 액세스 토큰 갱신 시도...');
-    
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${refreshToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      
-      // 새로운 액세스 토큰 저장
-      if (data.accessToken) {
-        saveAccessToken(data.accessToken);
-        console.log('액세스 토큰 갱신 성공');
-        
-        // 새로운 리프레시 토큰이 있으면 업데이트
-        if (data.refreshToken) {
-          localStorage.setItem('REFRESH_TOKEN', data.refreshToken);
-          console.log('리프레시 토큰도 업데이트됨');
-        }
-        
-        return true;
-      }
-    } else {
-      console.log('리프레시 토큰도 만료됨');
-      handleTokenExpired();
-      return false;
-    }
-  } catch (error) {
-    console.error('토큰 갱신 중 에러:', error);
-    return false;
-  }
-  
-  return false;
-}
-
-// 서버에서 토큰 유효성을 실제로 검증하고 필요시 자동 갱신
+// 서버에서 토큰 유효성을 실제로 검증하는 함수
 export async function isAuthenticatedWithServer(): Promise<boolean> {
   const localAuth = isAuthenticated();
   if (!localAuth) {
@@ -138,8 +90,8 @@ export async function isAuthenticatedWithServer(): Promise<boolean> {
   }
 
   try {
-    // 먼저 현재 토큰으로 인증 확인
-    const checkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/check`, {
+    // 서버에 토큰 유효성 검사 요청
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getAccessToken()}`,
@@ -147,27 +99,14 @@ export async function isAuthenticatedWithServer(): Promise<boolean> {
       },
     });
 
-    // 토큰이 유효하면 바로 true 반환
-    if (checkResponse.ok) {
-      return true;
+    if (response.status === 401) {
+      // 토큰이 만료된 경우 로컬 정보 정리
+      console.log('서버에서 토큰 만료 확인됨, 로컬 인증 정보 정리');
+      handleTokenExpired();
+      return false;
     }
 
-    // 401 에러인 경우 리프레시 토큰으로 갱신 시도
-    if (checkResponse.status === 401) {
-      console.log('액세스 토큰 만료, 리프레시 토큰으로 갱신 시도...');
-      
-      const refreshSuccess = await refreshAccessToken();
-      if (refreshSuccess) {
-        console.log('토큰 갱신 성공, 인증 상태 유지');
-        return true;
-      } else {
-        console.log('토큰 갱신 실패, 로그아웃 처리');
-        handleTokenExpired();
-        return false;
-      }
-    }
-
-    return false;
+    return response.ok;
   } catch (error) {
     console.error('서버 인증 확인 중 에러:', error);
     // 네트워크 에러 등의 경우 로컬 토큰이 있으면 일단 인증된 것으로 처리

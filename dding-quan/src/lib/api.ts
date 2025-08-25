@@ -8,7 +8,7 @@ import {
   User,
   Professor,
 } from '../types/types'
-import { getAccessToken, removeAccessToken, handleTokenExpired, refreshAccessToken } from './auth';
+import { getAccessToken, removeAccessToken, handleTokenExpired, saveAccessToken } from './auth';
 
 // API 기본 설정
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
@@ -229,6 +229,7 @@ export async function createAnswer(answerData: CreateAnswerRequest & { title?: s
 
 export async function adoptAnswer(): Promise<void> {
   const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection`, {
+    
     method: 'POST',
   });
 
@@ -239,8 +240,15 @@ export async function adoptAnswer(): Promise<void> {
 
 // 과목 관련 API
 export async function fetchSubjects(): Promise<Array<{ id: number; name: string }>> {
+  const token = getToken();
+  console.log(token);
+  
   const response = await authenticatedFetch(`${BASE_URL}/api/subjects/search`, {
     method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
   });
 
   if (!response.ok) {
@@ -253,8 +261,15 @@ export async function fetchSubjects(): Promise<Array<{ id: number; name: string 
 
 // 교수 관련 API
 export async function fetchProfessorsBySubject(): Promise<Professor[]> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+
   const response = await authenticatedFetch(`${BASE_URL}/api/professors/by-subject`, {
     method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
   });
 
   if (!response.ok) {
@@ -267,8 +282,15 @@ export async function fetchProfessorsBySubject(): Promise<Professor[]> {
 
 // 사용자 관련 API
 export async function fetchUserProfile(): Promise<User> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+
   const response = await authenticatedFetch(`${BASE_URL}/api/users/me`, {
     method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
   });
 
   if (!response.ok) {
@@ -282,9 +304,16 @@ export async function fetchUserProfile(): Promise<User> {
 }
 
 export async function completeUserProfile(profileData: { nickname: string; grade: string; major: string; email: string }): Promise<User> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+  
   const response = await authenticatedFetch(`${BASE_URL}/api/users/complete-profile`, {
     method: 'PUT',
     body: JSON.stringify(profileData),
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
   });
 
   if (!response.ok) {
@@ -297,9 +326,16 @@ export async function completeUserProfile(profileData: { nickname: string; grade
 
 // AI 관련 API
 export async function generateAIResponse(prompt: Record<string, string>): Promise<Record<string, string>> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+
   const response = await authenticatedFetch(`${BASE_URL}/api/ai/generate`, {
     method: 'POST',
     body: JSON.stringify(prompt),
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
   });
 
   if (!response.ok) {
@@ -317,12 +353,61 @@ export async function logout(): Promise<void> {
 
   const response = await authenticatedFetch(`${BASE_URL}/api/auth/logout`, {
     method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
   });
 
   removeAccessToken();
   
   if (!response.ok) {
     console.warn('Logout request failed, but token was removed locally');
+  }
+}
+
+// 리프레시 토큰으로 액세스 토큰 갱신
+export async function refreshAccessToken(): Promise<boolean> {
+  const token = getToken();
+  if (!token) throw new Error('Authentication required');
+
+  const refreshToken = localStorage.getItem('REFRESH_TOKEN');
+  if (!refreshToken) {
+    console.log('리프레시 토큰이 없습니다.');
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      console.log(`토큰 갱신 실패: ${response.status}`);
+      if (response.status === 401) handleTokenExpired();
+      return false;
+    }
+
+    const data = await response.json();
+    
+    if (data.accessToken) {
+      saveAccessToken(data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem('REFRESH_TOKEN', data.refreshToken);
+      }
+      console.log('토큰 갱신 성공');
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('토큰 갱신 중 에러:', error);
+    return false;
   }
 }
 
@@ -333,6 +418,10 @@ export async function checkAuth(): Promise<boolean> {
   try {
     const response = await authenticatedFetch(`${BASE_URL}/api/auth/check`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      }
     });
 
     return response.ok;
