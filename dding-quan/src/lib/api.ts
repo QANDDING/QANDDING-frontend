@@ -47,9 +47,9 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   const response = await fetch(url, {
     method: 'GET',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   console.log('질문 목록 API 응답:', response.status, response.statusText);
@@ -72,9 +72,9 @@ export async function fetchQuestion(id: string): Promise<Question> {
   const response = await fetch(`${BASE_URL}/api/questions/${id}`, {
     method: 'GET',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -106,9 +106,8 @@ export async function createQuestion(questionData: CreateQuestionRequest): Promi
   const response = await fetch(`${BASE_URL}/api/questions`, {
     method: 'POST',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
     },
-    credentials: 'include',
     body: formData,
   });
 
@@ -127,9 +126,9 @@ export async function deleteQuestion(id: string): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/questions/${id}`, {
     method: 'DELETE',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -145,9 +144,9 @@ export async function fetchAnswers(questionId: string): Promise<Answer[]> {
   const response = await fetch(`${BASE_URL}/api/answers/combined?questionPostId=${questionId}`, {
     method: 'GET',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -177,9 +176,8 @@ export async function createAnswer(answerData: CreateAnswerRequest & { title?: s
   const response = await fetch(`${BASE_URL}/api/user-answers?questionPostId=${answerData.questionId}`, {
     method: 'POST',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
     },
-    credentials: 'include',
     body: formData,
   });
 
@@ -198,9 +196,9 @@ export async function adoptAnswer(answerId: string): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/answers/selection?answerPostId=${answerId}`, {
     method: 'POST',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -213,12 +211,12 @@ export async function fetchSubjects(query: string): Promise<Array<{ id: number; 
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/subjects/search`, {
+  const response = await fetch(`${BASE_URL}/api/subjects/search?query=${encodeURIComponent(query)}`, {
     method: 'GET',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -234,12 +232,12 @@ export async function fetchProfessorsBySubject(subjectId: number): Promise<Profe
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/professors/by-subject?subjectId`, {
+  const response = await fetch(`${BASE_URL}/api/professors/by-subject?subjectId=${subjectId}`, {
     method: 'GET',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -261,9 +259,9 @@ export async function fetchUserProfile(): Promise<User> {
   const response = await fetch(`${BASE_URL}/api/users/me`, {
     method: 'GET',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -286,10 +284,9 @@ export async function completeUserProfile(profileData: { nickname: string; grade
   const response = await fetch(`${BASE_URL}/api/users/complete-profile`, {
     method: 'PUT',
     headers: {
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      Cookie: `ACCESS_TOKEN=${token}`,
     },
-    credentials: 'include',
     body: JSON.stringify(profileData),
   });
 
@@ -309,10 +306,9 @@ export async function generateAIResponse(prompt: Record<string, string>): Promis
   const response = await fetch(`${BASE_URL}/api/ai/generate`, {
     method: 'POST',
     headers: {
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
-      Cookie: `ACCESS_TOKEN=${token}`,
     },
-    credentials: 'include',
     body: JSON.stringify(prompt),
   });
 
@@ -332,9 +328,9 @@ export async function logout(): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/auth/logout`, {
     method: 'POST',
     headers: {
-      Cookie: `ACCESS_TOKEN=${token}`,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
-    credentials: 'include',
   });
 
   removeAccessToken();
@@ -352,9 +348,9 @@ export async function checkAuth(): Promise<boolean> {
     const response = await fetch(`${BASE_URL}/api/auth/check`, {
       method: 'POST',
       headers: {
-        Cookie: `ACCESS_TOKEN=${token}`,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-      credentials: 'include',
     });
 
     return response.ok;
@@ -365,7 +361,7 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    const loginUrl = `${BASE_URL}/login`;
+    const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
     // 개발 환경에서만 상세 로그 출력
     if (process.env.NODE_ENV === 'development') {
       console.log('구글 로그인 시작:', {
