@@ -21,7 +21,10 @@ export function saveAuthUser(user: User): void {
   }
   
   try {
-    console.log('사용자 정보 저장 중:', { id: user.id, email: user.email, name: user.name });
+    // 개발 환경에서만 사용자 정보 저장 로그 출력
+    if (process.env.NODE_ENV === 'development') {
+      console.log('사용자 정보 저장 중:', { id: user.id, name: user.name });
+    }
     s.setItem(AUTH_USER_KEY, JSON.stringify(user));
     s.setItem(AUTH_TIME_KEY, String(Date.now()));
     
@@ -71,7 +74,10 @@ export function saveAccessToken(token: string): void {
     console.error('로컬 스토리지를 사용할 수 없습니다');
     return;
   }
-  console.log('토큰 저장 중:', token.substring(0, 20) + '...');
+  // 개발 환경에서만 토큰 저장 로그 출력
+  if (process.env.NODE_ENV === 'development') {
+    console.log('토큰 저장 중...');
+  }
   try {
     s.setItem(ACCESS_TOKEN_KEY, token);
     // 저장 확인
@@ -183,7 +189,10 @@ export function handleGoogleLoginCallback(): boolean {
   if (success === 'true' && accessToken) {
     try {
       console.log('JWT 토큰 파싱 시작...');
-      console.log('액세스 토큰 길이:', accessToken.length);
+      // 개발 환경에서만 토큰 정보 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('액세스 토큰 수신됨');
+      }
       
       // JWT 토큰 구조 확인
       const tokenParts = accessToken.split('.');
@@ -193,7 +202,10 @@ export function handleGoogleLoginCallback(): boolean {
       
       // JWT 토큰에서 사용자 정보 추출
       const tokenPayload = JSON.parse(atob(tokenParts[1]));
-      console.log('토큰 페이로드:', tokenPayload);
+      // 개발 환경에서만 토큰 페이로드 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('토큰 페이로드 파싱 완료');
+      }
       
       // 사용자 정보 구성
       const user = {

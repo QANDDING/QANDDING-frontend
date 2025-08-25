@@ -12,7 +12,10 @@ import { getAccessToken, removeAccessToken } from './auth';
 
 // API 기본 설정
 const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
-console.log('API BASE_URL:', BASE_URL);
+// 개발 환경에서만 BASE_URL 로그 출력
+if (process.env.NODE_ENV === 'development') {
+  console.log('API BASE_URL 설정됨');
+}
 
 
 
@@ -210,7 +213,7 @@ export async function fetchSubjects(query: string): Promise<Array<{ id: number; 
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/subjects/search?query=${encodeURIComponent(query)}`, {
+  const response = await fetch(`${BASE_URL}/api/subjects/search`, {
     method: 'GET',
     headers: {
       Cookie: `ACCESS_TOKEN=${token}`,
@@ -231,7 +234,7 @@ export async function fetchProfessorsBySubject(subjectId: number): Promise<Profe
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await fetch(`${BASE_URL}/api/professors/by-subject?subjectId=${subjectId}`, {
+  const response = await fetch(`${BASE_URL}/api/professors/by-subject?subjectId`, {
     method: 'GET',
     headers: {
       Cookie: `ACCESS_TOKEN=${token}`,
@@ -362,17 +365,62 @@ export async function checkAuth(): Promise<boolean> {
 
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
-    console.log('구글 로그인 시작:', {
-      currentUrl: window.location.href,
-      userAgent: navigator.userAgent
-    });
+    const loginUrl = `${BASE_URL}/login`;
+    // 개발 환경에서만 상세 로그 출력
+    if (process.env.NODE_ENV === 'development') {
+      console.log('구글 로그인 시작:', {
+        currentUrl: window.location.href,
+        userAgent: navigator.userAgent.substring(0, 50) + '...',
+        baseUrlSet: !!BASE_URL
+      });
+    } else {
+      console.log('구글 로그인 시작');
+    }
+    
+    // BASE_URL이 제대로 설정되었는지 확인
+    if (!BASE_URL) {
+      console.error('BASE_URL이 설정되지 않았습니다!');
+      alert('서버 URL이 설정되지 않았습니다. 관리자에게 문의하세요.');
+      return;
+    }
     
     // URL이 ASCII 문자만 포함하는지 확인
     const isValidUrl = /^[!-~\s]*$/.test(loginUrl);
     if (isValidUrl) {
       console.log('구글 OAuth2 페이지로 리다이렉트 중...');
-      window.location.href = loginUrl;
+      // 개발 환경에서만 리다이렉트 URL 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('리다이렉트 URL:', loginUrl);
+      }
+      
+      try {
+        // 여러 리다이렉트 방법 시도
+        console.log('방법 1: window.location.href 시도');
+        window.location.href = loginUrl;
+        
+        // 대안 방법들을 순차적으로 시도
+        setTimeout(() => {
+          if (window.location.href.includes('/login')) {
+            console.log('방법 2: window.location.assign 시도');
+            window.location.assign(loginUrl);
+            
+            setTimeout(() => {
+              if (window.location.href.includes('/login')) {
+                console.log('방법 3: window.open 시도');
+                const popup = window.open(loginUrl, '_self');
+                if (!popup) {
+                  console.error('팝업이 차단되었습니다');
+                  alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                }
+              }
+            }, 1000);
+          }
+        }, 1000);
+        
+      } catch (error) {
+        console.error('리다이렉트 중 에러 발생:', error);
+        alert('페이지 이동 중 오류가 발생했습니다.');
+      }
     } else {
       console.error('Invalid URL contains non-ASCII characters:', loginUrl);
       alert('Login URL is invalid. Please contact support.');
