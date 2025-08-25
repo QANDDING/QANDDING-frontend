@@ -386,7 +386,9 @@ export async function refreshAccessToken(): Promise<boolean> {
     }
 
     const data = await response.json();
-    
+    console.log(data);
+    console.log(data.accessToken);
+    console.log(data.refreshToken);
     if (data.accessToken) {
       saveAccessToken(data.accessToken);
       if (data.refreshToken) {
