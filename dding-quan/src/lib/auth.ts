@@ -91,7 +91,7 @@ export async function isAuthenticatedWithServer(): Promise<boolean> {
 
   try {
     // 서버에 토큰 유효성 검사 요청
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/check`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${getAccessToken()}`,
