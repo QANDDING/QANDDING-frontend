@@ -62,7 +62,20 @@ export default function LoginPage() {
           <span>Google로 로그인</span>
         </button>
         
-        {/* 디버깅용 임시 버튼들 */}
+        {/* 디버깅용 임시 버튼 */}
+        <button
+          type='button'
+          onClick={() => {
+            const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
+            const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
+            console.log('직접 URL 테스트 시작');
+            alert(`리다이렉트 URL 테스트를 시작합니다.\n\n브라우저 콘솔을 확인하세요.`);
+            window.open(loginUrl, '_blank');
+          }}
+          className='w-full px-4 py-2 text-sm bg-gray-100 border rounded-md hover:bg-gray-200 text-gray-600'
+        >
+          🔧 디버그: URL 직접 테스트
+        </button>
         <div className='pt-2 text-center'>
           <Link href='/' className='text-sm text-blue-600 hover:underline'>
             로그인되었나요? 메인으로 이동
