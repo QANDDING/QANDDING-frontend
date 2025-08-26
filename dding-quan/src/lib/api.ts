@@ -303,7 +303,7 @@ export async function fetchUserProfile(): Promise<User> {
   return data;
 }
 
-export async function completeUserProfile(profileData: { nickname: string; grade: string; major: string; email: string }): Promise<User> {
+export async function completeUserProfile(profileData: { nickname: string; grade: string; major: string }): Promise<User> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
   

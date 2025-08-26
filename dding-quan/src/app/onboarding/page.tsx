@@ -7,8 +7,9 @@ import { saveAuthUser } from '@/lib/auth';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [bio, setBio] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [grade, setGrade] = useState('');
+  const [major, setMajor] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -16,9 +17,7 @@ export default function OnboardingPage() {
       try {
         const me = await userApi.getProfile();
         if (me) {
-          setName(me.name || '');
-          
-          setBio((me.bio as string) || '');
+          setNickname(me.name || '');
         }
       } catch {}
     })();
@@ -26,14 +25,18 @@ export default function OnboardingPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!name.trim()) {
-      alert('이름을 입력해주세요.');
+    if (!nickname.trim()) {
+      alert('닉네임을 입력해주세요.');
+      return;
+    }
+    if (!grade) {
+      alert('학년을 선택해주세요.');
       return;
     }
     setLoading(true);
     try {
       // 스웨거 명세: /api/users/complete-profile 사용
-      const updated = await userApi.completeProfile({ nickname: name.trim(), grade: '', major: '', email: '' });
+      const updated = await userApi.completeProfile({ nickname: nickname.trim(), grade, major: major.trim() });
       saveAuthUser(updated);
       router.replace('/');
     } catch (err) {
@@ -47,35 +50,43 @@ export default function OnboardingPage() {
     <main className="min-h-screen flex items-center justify-center bg-gray-50 px-6">
       <form onSubmit={handleSubmit} className="w-full max-w-md rounded-xl bg-white border p-6 space-y-5">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold">간단한 자기소개</h1>
-          <p className="text-sm text-gray-500">처음 오셨네요! 이름과 간단한 소개를 남겨주세요.</p>
+          <h1 className="text-xl font-semibold">프로필 설정</h1>
+          <p className="text-sm text-gray-500">처음 오셨네요! 기본 정보를 입력해주세요.</p>
         </div>
         <div>
-          <label className="block text-sm text-gray-600 mb-1">이름</label>
+          <label className="block text-sm text-gray-600 mb-1">닉네임</label>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
             className="w-full rounded-md border px-3 py-2 text-sm outline-none"
             placeholder="예: 홍길동"
           />
         </div>
         <div>
-          <label className="block text-sm text-gray-600 mb-1">소개</label>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            className="w-full h-28 resize-y rounded-md border px-3 py-2 text-sm outline-none"
-            placeholder="간단한 자기소개를 적어주세요"
+          <label className="block text-sm text-gray-600 mb-1">학년</label>
+          <select
+            value={grade}
+            onChange={(e) => setGrade(e.target.value)}
+            className="w-full rounded-md border px-3 py-2 text-sm outline-none bg-white"
+          >
+            <option value="" disabled>학년을 선택하세요</option>
+            <option value="1학년">1학년</option>
+            <option value="2학년">2학년</option>
+            <option value="3학년">3학년</option>
+            <option value="4학년">4학년</option>
+            <option value="그외">그외</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">전공</label>
+          <input
+            value={major}
+            onChange={(e) => setMajor(e.target.value)}
+            className="w-full rounded-md border px-3 py-2 text-sm outline-none"
+            placeholder="예: 컴퓨터공학"
           />
         </div>
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => router.replace('/')}
-            className="px-4 py-2 rounded-md border text-sm"
-          >
-            건너뛰기
-          </button>
           <button
             type="submit"
             disabled={loading}
