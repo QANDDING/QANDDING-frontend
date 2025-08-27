@@ -101,6 +101,9 @@ export interface QuestionListParams {
   size?: number; // pageSize 대신 size 사용
   subjectId?: number;
   professorId?: number;
+  keyword?: string;
+  status?: 'ALL' | 'ANSWERED' | 'UNANSWERED' | 'ADOPTED';
+  // 유지 호환: 과거 필드 (현재 미사용)
   hasAnswer?: boolean;
   isAdopted?: boolean;
   authorId?: number;

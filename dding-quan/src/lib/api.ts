@@ -88,6 +88,66 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}, isRetr
   return response;
 };
 
+// ------- S3 Presigned Upload Helpers (per Swagger: Storage) -------
+async function getPresignedUploadUrl(key: string): Promise<string> {
+  const url = `${BASE_URL}/api/storage/presign?` + new URLSearchParams({ key }).toString();
+  const res = await authenticatedFetch(url, { method: 'GET' });
+  if (!res.ok) throw new Error(`Failed to get presigned URL: ${res.status}`);
+  const text = await res.text();
+  return text.replace(/^"|"$/g, ''); // in case server returns JSON string
+}
+
+function uploadFileToS3WithProgress(presignedUrl: string, file: File, onProgress?: (loaded: number, total: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', presignedUrl, true);
+      // 주의: 일부 presign은 Content-Type을 서명에 포함하지 않음. 헤더를 설정하지 않아 불일치 방지.
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) onProgress(e.loaded, e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`S3 upload failed: ${xhr.status} ${xhr.statusText}`));
+      };
+      xhr.onerror = () => reject(new Error('S3 upload network error (CORS or network)'));
+      xhr.send(file);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function makeS3Key(prefix: string, file: File): string {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const p = prefix.replace(/\/+$/,'');
+  return `${p}/${ts}-${rand}-${safeName}`;
+}
+
+async function presignAndUpload(
+  prefix: string,
+  files: File[] = [],
+  onFileProgress?: (info: { index: number; file: File; percent: number }) => void,
+): Promise<string[]> {
+  const urls: string[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const key = makeS3Key(prefix, f);
+    const presigned = await getPresignedUploadUrl(key);
+    await uploadFileToS3WithProgress(presigned, f, (loaded, total) => {
+      if (onFileProgress) {
+        const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+        onFileProgress({ index: i, file: f, percent });
+      }
+    });
+    const publicUrl = presigned.split('?')[0];
+    urls.push(publicUrl);
+  }
+  return urls;
+}
+
 // 질문 관련 API
 export async function fetchQuestions(params: QuestionListParams = {}): Promise<PaginatedResponse<Question>> {
   const searchParams = new URLSearchParams();
@@ -95,6 +155,8 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
   if (params.size !== undefined) searchParams.append('size', params.size.toString());
   if (params.subjectId) searchParams.append('subjectId', params.subjectId.toString());
   if (params.professorId) searchParams.append('professorId', params.professorId.toString());
+  if ((params as any).keyword) searchParams.append('keyword', String((params as any).keyword));
+  if ((params as any).status) searchParams.append('status', String((params as any).status));
 
   const queryString = searchParams.toString();
   const url = queryString ? `${BASE_URL}/api/questions?${queryString}` : `${BASE_URL}/api/questions`;
@@ -129,28 +191,33 @@ export async function fetchDetailQuestion(id: string): Promise<Question> {
   return data;
 }
 
-export async function createQuestion(questionData: CreateQuestionRequest): Promise<Question> {
-  const formData = new FormData();
-  formData.append('title', questionData.title);
-  formData.append('content', questionData.content);
-  if (questionData.subjectId) formData.append('subjectId', questionData.subjectId.toString());
-  if (questionData.professorId) formData.append('professorId', questionData.professorId.toString());
-  
-  if (questionData.files) {
-    questionData.files.forEach(file => {
-      if (file instanceof File) {
-        formData.append('files', file);
-      }
-    });
+export async function createQuestion(
+  questionData: CreateQuestionRequest,
+  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
+): Promise<Question> {
+  // Swagger: POST /api/questions expects JSON with imageUrls (presigned upload)
+  let imageUrls: string[] | undefined = undefined;
+  if (questionData.files && questionData.files.length > 0) {
+    imageUrls = await presignAndUpload('uploads/questions', questionData.files, opts?.onProgress);
   }
+
+  const payload: any = {
+    title: questionData.title,
+    content: questionData.content,
+    subjectId: questionData.subjectId,
+    professorId: questionData.professorId,
+    ...(imageUrls ? { imageUrls } : {}),
+  };
 
   const response = await authenticatedFetch(`${BASE_URL}/api/questions`, {
     method: 'POST',
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create question: ${response.status}`);
+    const t = await response.text().catch(() => '');
+    throw new Error(`Failed to create question: ${response.status} ${t}`);
   }
 
   const data = await response.json();
@@ -175,75 +242,69 @@ export async function deleteQuestion(id: string): Promise<void> {
 }
 
 // 답변 관련 API
-export async function fetchAnswers(questionId: number): Promise<Answer[]> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
-  const response = await fetch(`${BASE_URL}/api/user-answers/${questionId}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
+// New: combined answers feed (AI + users paginated)
+export async function fetchCombinedAnswers(questionPostId: number, page = 0, size = 3): Promise<{
+  ai?: Answer | null;
+  users: PaginatedResponse<Answer> | { content: Answer[]; totalElements: number; totalPages: number; size: number; number: number; first: boolean; last: boolean };
+}> {
+  const params = new URLSearchParams({ questionPostId: String(questionPostId), page: String(page), size: String(size) });
+  const response = await authenticatedFetch(`${BASE_URL}/api/answers/combined?${params.toString()}`, { method: 'GET' });
   if (!response.ok) {
-    throw new Error(`Failed to fetch answers: ${response.status}`);
+    throw new Error(`Failed to fetch combined answers: ${response.status}`);
   }
-
-  const data = await response.json();
-  return data.users?.content || [];
+  return response.json();
 }
 
-export async function createAnswer(answerData: CreateAnswerRequest & { title?: string }): Promise<Answer> {
-  const token = getToken();
-  if (!token) throw new Error('Authentication required');
-
-  const formData = new FormData();
-  formData.append('title', answerData.title || '답변');
-  formData.append('content', answerData.content);
-  
-  if (answerData.files) {
-    answerData.files.forEach(file => {
-      if (file instanceof File) {
-        formData.append('files', file);
-      }
-    });
+export async function createAnswer(
+  answerData: CreateAnswerRequest & { title?: string },
+  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
+): Promise<Answer> {
+  // Swagger: POST /api/user-answers expects JSON with imageUrls
+  let imageUrls: string[] | undefined = undefined;
+  if (answerData.files && answerData.files.length > 0) {
+    imageUrls = await presignAndUpload('uploads/answers', answerData.files, opts?.onProgress);
   }
 
-  const response = await fetch(`${BASE_URL}/api/user-answers`, {
+  const payload: any = {
+    title: answerData.title || '답변',
+    content: answerData.content,
+    questionPostId: Number((answerData as any).questionId ?? (answerData as any).questionPostId),
+    ...(imageUrls ? { imageUrls } : {}),
+  };
+
+  const response = await authenticatedFetch(`${BASE_URL}/api/user-answers`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-    body: formData,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create answer: ${response.status}`);
+    const t = await response.text().catch(() => '');
+    throw new Error(`Failed to create answer: ${response.status} ${t}`);
   }
 
   const data = await response.json();
   return data;
 }
 
-export async function adoptAnswer(): Promise<void> {
-  const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection`, {
-    
-    method: 'POST',
-  });
-
+export async function adoptAnswer(answerPostId: number): Promise<void> {
+  const qs = new URLSearchParams({ answerPostId: String(answerPostId) }).toString();
+  const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection?${qs}`, { method: 'POST' });
   if (!response.ok) {
     throw new Error(`Failed to adopt answer: ${response.status}`);
   }
 }
 
 // 과목 관련 API
-export async function fetchSubjects(): Promise<Array<{ id: number; name: string }>> {
+export async function fetchSubjects(query: string): Promise<Array<{ id: number; name: string }>> {
   const token = getToken();
   console.log(token);
   
-  const response = await authenticatedFetch(`${BASE_URL}/api/subjects/search`, {
+  const params = new URLSearchParams();
+  if (query) params.set('query', query);
+  const url = `${BASE_URL}/api/subjects/search?${params.toString()}`;
+
+  const response = await authenticatedFetch(url, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -260,11 +321,14 @@ export async function fetchSubjects(): Promise<Array<{ id: number; name: string 
 }
 
 // 교수 관련 API
-export async function fetchProfessorsBySubject(): Promise<Professor[]> {
+export async function fetchProfessorsBySubject(subjectId: number): Promise<Professor[]> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
 
-  const response = await authenticatedFetch(`${BASE_URL}/api/professors/by-subject`, {
+  const params = new URLSearchParams({ subjectId: String(subjectId) });
+  const url = `${BASE_URL}/api/professors/by-subject?${params.toString()}`;
+
+  const response = await authenticatedFetch(url, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -498,7 +562,8 @@ export const questionApi = {
 };
 
 export const answerApi = {
-  getByQuestionId: fetchAnswers,
+  // New combined feed
+  getCombined: fetchCombinedAnswers,
   create: createAnswer,
   adopt: adoptAnswer,
 };
