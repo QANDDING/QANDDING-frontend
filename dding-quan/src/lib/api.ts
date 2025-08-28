@@ -1,4 +1,16 @@
-import { Question, CreateQuestionRequest, Answer, CreateAnswerRequest, PaginatedResponse, QuestionListParams, QuestionListItem, User, Professor, UserPostsResponse } from '../types/types';
+import {
+  Question,
+  CreateQuestionRequest,
+  CreateQuestionResponse,
+  Answer,
+  CreateAnswerRequest,
+  PaginatedResponse,
+  QuestionListParams,
+  QuestionListItem,
+  User,
+  Professor,
+  UserPostsResponse,
+} from '../types/types';
 import { getAccessToken, removeAccessToken, handleTokenExpired, saveAccessToken } from './auth';
 
 // API 기본 설정
@@ -176,7 +188,7 @@ export async function fetchDetailQuestion(id: string): Promise<Question> {
   return data;
 }
 
-export async function createQuestion(questionData: CreateQuestionRequest, opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void }): Promise<Question> {
+export async function createQuestion(questionData: CreateQuestionRequest, opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void }): Promise<CreateQuestionResponse> {
   // Swagger: POST /api/questions expects JSON with imageUrls (presigned upload)
   let imageUrls: string[] | undefined = undefined;
   if (questionData.files && questionData.files.length > 0) {
@@ -200,6 +212,35 @@ export async function createQuestion(questionData: CreateQuestionRequest, opts?:
   if (!response.ok) {
     const t = await response.text().catch(() => '');
     throw new Error(`Failed to create question: ${response.status} ${t}`);
+  }
+
+  const data: CreateQuestionResponse = await response.json();
+  return data;
+}
+
+export async function updateQuestion(id: string, questionData: CreateQuestionRequest): Promise<Question> {
+  let imageUrls: string[] | undefined = undefined;
+  if (questionData.files && questionData.files.length > 0) {
+    imageUrls = await presignAndUpload('uploads/questions', questionData.files);
+  }
+
+  const payload: { title: string; content: string; subjectId?: number; professorId?: number; imageUrls?: string[] } = {
+    title: questionData.title,
+    content: questionData.content,
+    subjectId: questionData.subjectId,
+    professorId: questionData.professorId,
+    ...(imageUrls ? { imageUrls } : {}),
+  };
+
+  const response = await authenticatedFetch(`${BASE_URL}/api/questions/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const t = await response.text().catch(() => '');
+    throw new Error(`Failed to update question: ${response.status} ${t}`);
   }
 
   const data: Question = await response.json();
@@ -529,6 +570,7 @@ export const questionApi = {
   getList: fetchQuestions,
   getById: fetchDetailQuestion,
   create: createQuestion,
+  update: updateQuestion,
   delete: deleteQuestion,
 };
 
@@ -669,3 +711,22 @@ export async function fetchUserPosts(page = 0, size = 10, opts?: { keyword?: str
 export const historyApi = {
   getMyPosts: fetchUserPosts,
 };
+
+// ----- AI Problem submit (custom endpoint) -----
+export async function createAiProblem(payload: { subjectId: number; file: File }): Promise<unknown> {
+  const fd = new FormData();
+  fd.append('subjectId', String(payload.subjectId));
+  fd.append('file', payload.file);
+
+  const url = `${BASE_URL}/aip/v1/problems`;
+  const res = await authenticatedFetch(url, { method: 'POST', body: fd });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to submit problem: ${res.status} ${t}`);
+  }
+  try {
+    return (await res.json()) as unknown;
+  } catch {
+    return {} as unknown;
+  }
+}

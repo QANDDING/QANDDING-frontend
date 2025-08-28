@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logout, getAccessToken, getAuthUser } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
-import { History, House, MessageSquareText, FileQuestionMark, Hourglass, Repeat2, LogOut } from "lucide-react";
+import { History, House, MessageSquareText, FileQuestion, Hourglass, Repeat2, LogOut } from "lucide-react";
 import toast from "react-hot-toast";
 
 
@@ -171,24 +171,28 @@ export default function NavBar() {
         <Link
           href="/"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          title="홈으로 이동"
         >
           <House />
         </Link>
         <Link
           href="/ask"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          title="질문하기"
         >
-          <FileQuestionMark />
+          <FileQuestion />
         </Link>
         <Link
           href="/board"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          title="게시판"
         >
           <MessageSquareText />
         </Link>
         <Link
           href="/history"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          title="히스토리"
         >
           <History />
         </Link>
@@ -222,6 +226,7 @@ export default function NavBar() {
         <button
           onClick={handleLogout}
           className="rounded-lg bg-red-100 text-red-700 px-4 py-1 text-sm font-medium hover:bg-red-200"
+          title="로그아웃"
         >
           <LogOut />
         </button>
