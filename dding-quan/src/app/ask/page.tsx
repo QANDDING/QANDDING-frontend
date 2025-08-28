@@ -8,9 +8,8 @@ import { isAuthenticated } from '@/lib/auth';
 function AskPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [initialQuestion, setInitialQuestion] = useState<string>('');
+  const [initialQuestion] = useState<string>('');
   const [stage, setStage] = useState<'quick' | 'detail'>('detail');
-  const [subject, setSubject] = useState('');
   const [professors, setProfessors] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProfessorId, setSelectedProfessorId] = useState('');
   const [loadingProf, setLoadingProf] = useState(false);
