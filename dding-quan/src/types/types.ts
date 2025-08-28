@@ -33,6 +33,13 @@ export interface CreateQuestionRequest {
   files?: File[]; // 파일 객체 배열
 }
 
+// 질문 생성 응답 타입
+export interface CreateQuestionResponse {
+  code: string;
+  message: string;
+  data: number; // 생성된 질문의 ID
+}
+
 // 질문 수정 요청 타입
 export interface UpdateQuestionRequest {
   title?: string;
