@@ -716,7 +716,8 @@ export const historyApi = {
 export async function createAiProblem(payload: { subjectId: number; file: File }): Promise<unknown> {
   const fd = new FormData();
   fd.append('subjectId', String(payload.subjectId));
-  fd.append('file', payload.file);
+  // Backend expects the file part name to be 'imageFile'
+  fd.append('imageFile', payload.file);
 
   const url = `${BASE_URL}/api/v1/problems`;
   const res = await authenticatedFetch(url, { method: 'POST', body: fd });
