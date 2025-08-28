@@ -718,7 +718,7 @@ export async function createAiProblem(payload: { subjectId: number; file: File }
   fd.append('subjectId', String(payload.subjectId));
   fd.append('file', payload.file);
 
-  const url = `${BASE_URL}/aip/v1/problems`;
+  const url = `${BASE_URL}/api/v1/problems`;
   const res = await authenticatedFetch(url, { method: 'POST', body: fd });
   if (!res.ok) {
     const t = await res.text().catch(() => '');
