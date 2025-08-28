@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logout, getAccessToken, getAuthUser } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
-import { History, House, MessageSquareText, FileQuestionMark, Hourglass, Repeat2, LogOut } from "lucide-react";
+import { History, House, MessageSquareText, FileQuestion, Hourglass, Repeat2, LogOut } from "lucide-react";
 import toast from "react-hot-toast";
 
 
@@ -180,7 +180,7 @@ export default function NavBar() {
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
           title="질문하기"
         >
-          <FileQuestionMark />
+          <FileQuestion />
         </Link>
         <Link
           href="/board"
