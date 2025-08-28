@@ -15,14 +15,7 @@ function AskPageContent() {
   const [selectedProfessorId, setSelectedProfessorId] = useState('');
   const [loadingProf, setLoadingProf] = useState(false);
 
-  function handleQuickSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const q = String(formData.get('q') || '').trim();
-    if (!q) return;
-    setInitialQuestion(q);
-    setStage('detail');
-  }
+  // 사용하지 않는 빠른 제출 로직 제거 (상세 폼만 사용)
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -30,7 +23,7 @@ function AskPageContent() {
   // AI 관련 로딩 상태 제거 (버튼 숨김)
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [subjectSuggestions, setSubjectSuggestions] = useState<Array<{ id: number; name: string }>>([]);
+  // 과거 검색 버튼용 상태 제거 (자동완성으로 대체)
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   // 보드와 동일한 과목 자동완성 상태
   const [subjectInput, setSubjectInput] = useState('');
@@ -116,41 +109,7 @@ function AskPageContent() {
 
   // 교수 검색 버튼 제거: 과목 선택 시 자동 로딩
 
-  async function handleSearchSubjects() {
-    const keyword = subject.trim();
-    if (!keyword) {
-      setSubjectSuggestions([]);
-      return;
-    }
-    try {
-      console.log('과목 검색 시작:', keyword);
-      const suggestions = await subjectsApi.search(keyword);
-      console.log('과목 검색 성공:', suggestions);
-      setSubjectSuggestions(suggestions || []);
-    } catch (e) {
-      console.error('과목 검색 에러:', e);
-      if (e instanceof Error && e.message === 'Authentication required') {
-        console.log('Authentication required, redirecting to login');
-        window.location.href = '/login';
-        return;
-      }
-      
-      // 500 에러인 경우 사용자에게 알림
-      if (e instanceof Error && e.message.includes('500')) {
-        console.error('서버 내부 에러 발생:', e.message);
-        alert('Subject search failed due to server error. Please try again later.');
-      }
-      
-      setSubjectSuggestions([]);
-    }
-  }
-
-  function handleSubjectChange(next: string) {
-    setSubject(next);
-    setSelectedProfessorId('');
-    setSubjectSuggestions([]);
-    setSelectedSubjectId(null);
-  }
+  // 버튼 기반 검색/변경 핸들러 제거 (자동완성/선택 로직으로 대체)
 
 
   // 교수 목록 로드 (과목 선택 시)
@@ -318,7 +277,13 @@ function AskPageContent() {
                 onDrop={(e) => {
                   e.preventDefault();
                   const files = Array.from(e.dataTransfer.files || []).filter(f => /^(image\/.*|application\/pdf)$/.test(f.type));
-                  if (files.length && !submitting) setSelectedFiles(prev => [...prev, ...files]);
+                  if (files.length && !submitting) setSelectedFiles(prev => {
+                    const cur = prev || [];
+                    const remaining = Math.max(0, 10 - cur.length);
+                    const nextToAdd = files.slice(0, remaining);
+                    if (files.length > remaining) alert('최대 10개까지 첨부할 수 있습니다.');
+                    return [...cur, ...nextToAdd];
+                  });
                 }}
                 className='rounded-md border border-dashed p-4 text-sm text-gray-600 bg-gray-50'
               >
@@ -336,7 +301,13 @@ function AskPageContent() {
                       className='hidden'
                       onChange={(e) => {
                         const list = Array.from(e.target.files || []);
-                        if (list.length && !submitting) setSelectedFiles(prev => [...prev, ...list]);
+                        if (list.length && !submitting) setSelectedFiles(prev => {
+                          const cur = prev || [];
+                          const remaining = Math.max(0, 10 - cur.length);
+                          const nextToAdd = list.slice(0, remaining);
+                          if (list.length > remaining) alert('최대 10개까지 첨부할 수 있습니다.');
+                          return [...cur, ...nextToAdd];
+                        });
                         e.currentTarget.value = '';
                       }}
                     />

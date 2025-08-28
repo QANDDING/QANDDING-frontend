@@ -1,7 +1,9 @@
 "use client";
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { questionApi, professorApi, subjectsApi } from '@/lib/api';
+import { formatKST } from '@/lib/datetime';
+import { questionApi, professorApi, subjectsApi, answerApi } from '@/lib/api';
+import type { QuestionListItem, PaginatedResponse, QuestionListParams } from '@/types/types';
 import { isAuthenticated } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
@@ -40,24 +42,10 @@ export default function BoardPage() {
   const [isLast, setIsLast] = useState(true);
   const size = 10;
   const [searchDraft, setSearchDraft] = useState('');
+  const [answerCounts, setAnswerCounts] = useState<Record<string, number>>({});
+  const [countLoading, setCountLoading] = useState<Record<string, boolean>>({});
 
-  const formatKST = (iso?: string) => {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }).replace(/\./g, '-').replace(/-\s/g, '-').replace(/\s$/, '');
-    } catch {
-      return iso;
-    }
-  };
+  // formatKST moved to global util
 
   useEffect(() => {
     // 인증 상태 확인
@@ -69,7 +57,7 @@ export default function BoardPage() {
     let mounted = true;
     (async () => {
       try {
-        const params: Record<string, any> = { page, size };
+        const params: QuestionListParams = { page, size };
         if (typeof selectedSubjectId === 'number') params.subjectId = selectedSubjectId;
         if (selectedProfessorId) params.professorId = Number(selectedProfessorId);
         if (searchTerm) params.keyword = searchTerm;
@@ -79,24 +67,25 @@ export default function BoardPage() {
           unanswered: 'UNANSWERED',
           adopted: 'ADOPTED',
         };
-        params.status = statusMap[selectedCategory] || 'ALL';
-        const result = await questionApi.getList(params);
+        params.status = (statusMap[selectedCategory] as QuestionListParams['status']) || 'ALL';
+        const result: PaginatedResponse<QuestionListItem> = await questionApi.getList(params);
         if (!mounted) return;
-        const items: BoardItem[] = (result.content || []).map((q: any) => {
-          const hasMember = (
-            q.hasMemberAnswer ??
-            q.hasUserAnswer ??
-            q.userAnswered ??
-            q.memberAnswered ??
-            (typeof q.memberAnswerCount === 'number' ? q.memberAnswerCount > 0 : undefined) ??
-            (typeof q.userAnswerCount === 'number' ? q.userAnswerCount > 0 : undefined)
-          );
-          const hasAi = (
-            q.hasAiAnswer ??
-            q.aiAnswered ??
-            q.hasAi ??
-            (typeof q.aiAnswerCount === 'number' ? q.aiAnswerCount > 0 : undefined)
-          );
+        const items: BoardItem[] = (result.content || []).map((q: QuestionListItem) => {
+          const r = q as unknown as Record<string, unknown>;
+          const normFlag = (keys: string[]) => {
+            for (const k of keys) {
+              const v = r[k];
+              if (typeof v === 'boolean') return v;
+              if (typeof v === 'number') return v > 0;
+            }
+            return false;
+          };
+          const hasMember = normFlag([
+            'hasMemberAnswer', 'hasUserAnswer', 'userAnswered', 'memberAnswered',
+            'memberAnswerCount', 'userAnswerCount',
+          ]);
+          const hasAi = normFlag(['hasAiAnswer', 'aiAnswered', 'hasAi', 'aiAnswerCount']);
+          const isAdopted = normFlag(['isAdopted', 'adopted', 'isSelected', 'hasAdopted']);
           return {
             id: String(q.id),
             title: q.title,
@@ -104,15 +93,15 @@ export default function BoardPage() {
             authorNickname: q.authorNickname || '',
             professorName: q.professorName || '',
             createdAt: q.createdAt,
-            hasAiAnswer: Boolean(hasAi),
-            hasMemberAnswer: Boolean(hasMember),
-            isAdopted: Boolean(q.isAdopted ?? q.adopted ?? q.isSelected ?? q.hasAdopted ?? false),
+            hasAiAnswer: hasAi,
+            hasMemberAnswer: hasMember,
+            isAdopted: isAdopted,
           };
         });
         setData({ items });
-        setTotalPages((result as any).totalPages ?? 0);
-        setIsFirst((result as any).first ?? true);
-        setIsLast((result as any).last ?? true);
+        setTotalPages(result.totalPages ?? 0);
+        setIsFirst(result.first ?? true);
+        setIsLast(result.last ?? true);
       } catch (e) {
         console.error(e);
         if (e instanceof Error && e.message === 'Authentication required') {
@@ -149,7 +138,6 @@ export default function BoardPage() {
   });
 
   const filteredProfessors = professors;
-  const selectedProfessor = professors.find((p) => p.id.toString() === selectedProfessorId) || null;
 
   // 과목 자동완성: 입력 디바운스 검색
   useEffect(() => {
@@ -192,6 +180,28 @@ export default function BoardPage() {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
+
+  // 보이는 목록의 사용자 답변 수 로드 (각 질문별 Combined users.totalElements)
+  useEffect(() => {
+    const ids = filteredItems.map((i) => i.id);
+    ids.forEach((id) => {
+      if (answerCounts[id] !== undefined || countLoading[id]) return;
+      setCountLoading((prev) => ({ ...prev, [id]: true }));
+      answerApi
+        .getCombined(Number(id), 0, 1)
+        .then((res: { users?: { totalElements?: number } }) => {
+          const total = res.users?.totalElements ?? 0;
+          setAnswerCounts((prev) => ({ ...prev, [id]: Number(total) || 0 }));
+        })
+        .catch(() => {
+          setAnswerCounts((prev) => ({ ...prev, [id]: 0 }));
+        })
+        .finally(() => {
+          setCountLoading((prev) => ({ ...prev, [id]: false }));
+        });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredItems]);
 
   const handleSelectSubject = async (subject: { id: number; name: string }) => {
     setSubjectInput(subject.name);
@@ -389,11 +399,11 @@ export default function BoardPage() {
                   <Link href={`/board/${item.id}`} className="block p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center justify-between gap-3 mb-2">
                           <h3 className="text-lg font-medium text-gray-900 truncate">
                             {item.title}
                           </h3>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             {item.isAdopted && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">채택완료</span>
                             )}
@@ -406,6 +416,9 @@ export default function BoardPage() {
                             {!item.isAdopted && !item.hasMemberAnswer && !item.hasAiAnswer && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">미답변</span>
                             )}
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700">
+                              답변 {answerCounts[item.id] ?? (countLoading[item.id] ? '…' : 0)}
+                            </span>
                           </div>
                         </div>
                         <p className="text-sm text-gray-600 mb-2">

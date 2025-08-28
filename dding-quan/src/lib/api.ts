@@ -5,8 +5,10 @@ import {
   CreateAnswerRequest,
   PaginatedResponse,
   QuestionListParams,
+  QuestionListItem,
   User,
   Professor,
+  UserPostsResponse,
 } from '../types/types'
 import { getAccessToken, removeAccessToken, handleTokenExpired, saveAccessToken } from './auth';
 
@@ -149,14 +151,14 @@ async function presignAndUpload(
 }
 
 // 질문 관련 API
-export async function fetchQuestions(params: QuestionListParams = {}): Promise<PaginatedResponse<Question>> {
+export async function fetchQuestions(params: QuestionListParams = {}): Promise<PaginatedResponse<QuestionListItem>> {
   const searchParams = new URLSearchParams();
   if (params.page !== undefined) searchParams.append('page', params.page.toString());
   if (params.size !== undefined) searchParams.append('size', params.size.toString());
   if (params.subjectId) searchParams.append('subjectId', params.subjectId.toString());
   if (params.professorId) searchParams.append('professorId', params.professorId.toString());
-  if ((params as any).keyword) searchParams.append('keyword', String((params as any).keyword));
-  if ((params as any).status) searchParams.append('status', String((params as any).status));
+  if (params.keyword) searchParams.append('keyword', params.keyword);
+  if (params.status) searchParams.append('status', params.status);
 
   const queryString = searchParams.toString();
   const url = queryString ? `${BASE_URL}/api/questions?${queryString}` : `${BASE_URL}/api/questions`;
@@ -173,7 +175,7 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
     throw new Error(`Failed to fetch questions: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data: PaginatedResponse<QuestionListItem> = await response.json();
   console.log('질문 목록 데이터:', data);
   return data;
 }
@@ -201,7 +203,7 @@ export async function createQuestion(
     imageUrls = await presignAndUpload('uploads/questions', questionData.files, opts?.onProgress);
   }
 
-  const payload: any = {
+  const payload: { title: string; content: string; subjectId?: number; professorId?: number; imageUrls?: string[] } = {
     title: questionData.title,
     content: questionData.content,
     subjectId: questionData.subjectId,
@@ -220,7 +222,7 @@ export async function createQuestion(
     throw new Error(`Failed to create question: ${response.status} ${t}`);
   }
 
-  const data = await response.json();
+  const data: Question = await response.json();
   return data;
 }
 
@@ -255,24 +257,32 @@ export async function fetchCombinedAnswers(questionPostId: number, page = 0, siz
   return response.json();
 }
 
+export async function deleteAnswerById(id: number): Promise<void> {
+  const response = await authenticatedFetch(`${BASE_URL}/api/answers/${id}`, { method: 'DELETE' });
+  if (!response.ok) {
+    const t = await response.text().catch(() => '');
+    throw new Error(`Failed to delete answer: ${response.status} ${t}`);
+  }
+}
+
 export async function createAnswer(
   answerData: CreateAnswerRequest & { title?: string },
   opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
 ): Promise<Answer> {
-  // Swagger: POST /api/user-answers expects JSON with imageUrls
+  // Swagger: POST /api/answers expects JSON with imageUrls
   let imageUrls: string[] | undefined = undefined;
   if (answerData.files && answerData.files.length > 0) {
     imageUrls = await presignAndUpload('uploads/answers', answerData.files, opts?.onProgress);
   }
 
-  const payload: any = {
+  const payload: { title: string; content: string; questionPostId: number; imageUrls?: string[] } = {
     title: answerData.title || '답변',
     content: answerData.content,
-    questionPostId: Number((answerData as any).questionId ?? (answerData as any).questionPostId),
+    questionPostId: Number((answerData as { questionId?: string; questionPostId?: number }).questionId ?? (answerData as { questionPostId?: number }).questionPostId ?? 0),
     ...(imageUrls ? { imageUrls } : {}),
   };
 
-  const response = await authenticatedFetch(`${BASE_URL}/api/user-answers`, {
+  const response = await authenticatedFetch(`${BASE_URL}/api/answers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -283,7 +293,7 @@ export async function createAnswer(
     throw new Error(`Failed to create answer: ${response.status} ${t}`);
   }
 
-  const data = await response.json();
+  const data: Answer = await response.json();
   return data;
 }
 
@@ -291,7 +301,19 @@ export async function adoptAnswer(answerPostId: number): Promise<void> {
   const qs = new URLSearchParams({ answerPostId: String(answerPostId) }).toString();
   const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection?${qs}`, { method: 'POST' });
   if (!response.ok) {
-    throw new Error(`Failed to adopt answer: ${response.status}`);
+    let msg = '';
+    try { msg = await response.text(); } catch {}
+    throw new Error(`Failed to adopt answer: ${response.status} ${msg || ''}`.trim());
+  }
+}
+
+export async function unadoptAnswer(questionPostId: number): Promise<void> {
+  const qs = new URLSearchParams({ questionPostId: String(questionPostId) }).toString();
+  const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection?${qs}`, { method: 'DELETE' });
+  if (!response.ok) {
+    let msg = '';
+    try { msg = await response.text(); } catch {}
+    throw new Error(`Failed to unadopt answer: ${response.status} ${msg || ''}`.trim());
   }
 }
 
@@ -362,7 +384,7 @@ export async function fetchUserProfile(): Promise<User> {
     throw new Error(`Failed to fetch user profile: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data: User = await response.json();
   console.log('사용자 프로필 조회 성공');
   return data;
 }
@@ -384,7 +406,7 @@ export async function completeUserProfile(profileData: { nickname: string; grade
     throw new Error(`Failed to complete profile: ${response.status}`);
   }
 
-  const data = await response.json();
+  const data: User = await response.json();
   return data;
 }
 
@@ -449,7 +471,7 @@ export async function refreshAccessToken(): Promise<boolean> {
       return false;
     }
 
-    const data = await response.json();
+    const data: { accessToken?: string; refreshToken?: string } = await response.json();
     console.log(data);
     console.log(data.accessToken);
     console.log(data.refreshToken);
@@ -566,6 +588,79 @@ export const answerApi = {
   getCombined: fetchCombinedAnswers,
   create: createAnswer,
   adopt: adoptAnswer,
+  delete: deleteAnswerById,
+  unadopt: unadoptAnswer,
+};
+
+// ----- Comment APIs -----
+type ThreadItem = {
+  parent: { id: number; nickname?: string; content: string; createdAt?: string; imageUrls?: string[] };
+  replies: Array<{ id: number; nickname?: string; content: string; createdAt?: string; imageUrls?: string[] }>;
+};
+
+export async function fetchComments(answerPostId: number, page = 0, size = 10): Promise<{ content: ThreadItem[]; page?: number; size?: number; totalElements?: number; totalPages?: number; last?: boolean }> {
+  const params = new URLSearchParams({ answerPostId: String(answerPostId), page: String(page), size: String(size) });
+  const res = await authenticatedFetch(`${BASE_URL}/api/comments?${params.toString()}`, { method: 'GET' });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch comments: ${res.status} ${t}`);
+  }
+  return res.json();
+}
+
+export async function createComment(
+  data: { answerPostId: number; content: string; files?: File[] },
+  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
+): Promise<void> {
+  let imageUrls: string[] | undefined = undefined;
+  if (data.files && data.files.length > 0) {
+    imageUrls = await presignAndUpload('uploads/comments', data.files, opts?.onProgress);
+  }
+  const payload: { answerPostId: number; content: string; imageUrls?: string[] } = { answerPostId: data.answerPostId, content: data.content, ...(imageUrls ? { imageUrls } : {}) };
+  const res = await authenticatedFetch(`${BASE_URL}/api/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to create comment: ${res.status} ${t}`);
+  }
+}
+
+export async function createReply(
+  data: { parentCommentId: number; content: string; files?: File[] },
+  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
+): Promise<void> {
+  let imageUrls: string[] | undefined = undefined;
+  if (data.files && data.files.length > 0) {
+    imageUrls = await presignAndUpload('uploads/comments', data.files, opts?.onProgress);
+  }
+  const payload: { parentCommentId: number; content: string; imageUrls?: string[] } = { parentCommentId: data.parentCommentId, content: data.content, ...(imageUrls ? { imageUrls } : {}) };
+  const res = await authenticatedFetch(`${BASE_URL}/api/comments/reply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to create reply: ${res.status} ${t}`);
+  }
+}
+
+export async function deleteComment(commentId: number): Promise<void> {
+  const res = await authenticatedFetch(`${BASE_URL}/api/comments/${commentId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to delete comment: ${res.status} ${t}`);
+  }
+}
+
+export const commentApi = {
+  list: fetchComments,
+  create: createComment,
+  reply: createReply,
+  delete: deleteComment,
 };
 
 export const subjectsApi = {
@@ -596,4 +691,32 @@ export const authApi = {
   startGoogleLogin,
   logout,
   checkAuth,
+};
+// ----- User posts (history) -----
+export async function fetchUserPosts(
+  page = 0,
+  size = 10,
+  opts?: { keyword?: string; postType?: 'QUESTION' | 'ANSWER' }
+): Promise<UserPostsResponse> {
+  const sp = new URLSearchParams();
+  sp.set('page', String(page));
+  if (typeof size === 'number') sp.set('size', String(size));
+  if (opts?.keyword) sp.set('keyword', opts.keyword);
+  if (opts?.postType) {
+    // 서버 호환: type/postType 모두 지원 (안전성 확보)
+    sp.set('type', opts.postType);
+    sp.set('postType', opts.postType);
+  }
+  const url = `${BASE_URL}/api/users/posts${sp.toString() ? `?${sp.toString()}` : ''}`;
+  if (process.env.NODE_ENV === 'development') console.log('GET /api/users/posts:', url);
+  const res = await authenticatedFetch(url, { method: 'GET' });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to fetch user posts: ${res.status} ${t}`);
+  }
+  return res.json();
+}
+
+export const historyApi = {
+  getMyPosts: fetchUserPosts,
 };
