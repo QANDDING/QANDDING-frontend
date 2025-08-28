@@ -80,6 +80,19 @@ export interface PaginatedResponse<T> {
   last: boolean;
 }
 
+// 질문 목록 아이템 (리스트 응답 전용)
+export interface QuestionListItem {
+  id: number;
+  title: string;
+  authorNickname?: string;
+  subjectName?: string;
+  professorName?: string;
+  createdAt?: string;
+  hasAiAnswer?: boolean;
+  hasMemberAnswer?: boolean;
+  isAdopted?: boolean;
+}
+
 // API 응답 타입
 export interface ApiResponse<T> {
   data: T;
@@ -101,6 +114,9 @@ export interface QuestionListParams {
   size?: number; // pageSize 대신 size 사용
   subjectId?: number;
   professorId?: number;
+  keyword?: string;
+  status?: 'ALL' | 'ANSWERED' | 'UNANSWERED' | 'ADOPTED';
+  // 유지 호환: 과거 필드 (현재 미사용)
   hasAnswer?: boolean;
   isAdopted?: boolean;
   authorId?: number;
@@ -129,6 +145,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  nickname?: string;
   avatar?: string;
   bio?: string;
   introduction?: string;
@@ -218,4 +235,21 @@ export interface BaseResponse<T = unknown> {
     details?: unknown;
   };
   timestamp: string;
+}
+
+// History: 사용자 작성 글 통합
+export type PostType = 'QUESTION' | 'ANSWER';
+export interface UnifiedPostDto {
+  postType: PostType;
+  postId: number;
+  title: string;
+  createdAt: string;
+  originalQuestionId?: number | null;
+}
+export interface UserPostsResponse {
+  posts: UnifiedPostDto[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }

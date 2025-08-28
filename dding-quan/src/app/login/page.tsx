@@ -2,40 +2,41 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { userApi, startGoogleLogin } from '../../lib/api';
-import { saveAuthUser, isAuthenticated, redirectToMain } from '@/lib/auth';
+import { startGoogleLogin } from '../../lib/api';
+import { isAuthenticated, isAuthenticatedWithServer, redirectToMain } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('로그인 페이지 로드됨');
-    
-    // 이미 인증된 상태라면 메인 페이지로 이동
-    if (isAuthenticated()) {
-      console.log('이미 인증된 사용자, 메인 페이지로 이동');
-      redirectToMain();
-      return;
-    }
+    const checkExistingAuth = async () => {
+      console.log('로그인 페이지 로드됨');
+      
+      // 로컬 토큰이 없으면 바로 로그인 대기
+      if (!isAuthenticated()) {
+        console.log('저장된 토큰이 없어 로그인이 필요합니다.');
+        return;
+      }
 
-    // OAuth 콜백은 /oauth/callback 페이지에서 처리됨
-
-    // 로그인된 세션이 이미 있으면 메인으로 이동
-    (async () => {
       try {
-        console.log('기존 세션 확인 중...');
-        const me = await userApi.getProfile();
-        if (me && me.id) {
-          console.log('기존 세션 발견, 사용자 정보 저장');
-          saveAuthUser(me);
-          // 로그인 성공 시 바로 메인 페이지로 이동
-          router.replace('/');
+        console.log('기존 세션 서버 검증 중...');
+        const serverAuth = await isAuthenticatedWithServer();
+        
+        if (serverAuth) {
+          console.log('기존 세션 유효 확인됨, 메인 페이지로 이동');
+          redirectToMain();
+        } else {
+          console.log('기존 세션 만료됨, 로그인 필요');
+          // isAuthenticatedWithServer에서 이미 토큰 정리됨
         }
       } catch (error) {
-        console.log('기존 세션 없음 또는 에러:', error);
+        console.log('기존 세션 확인 중 에러:', error);
+        // 에러 발생 시에는 로그인 대기 상태 유지
       }
-    })();
+    };
+
+    checkExistingAuth();
   }, [router]);
 
   return (
@@ -59,6 +60,21 @@ export default function LoginPage() {
             <path fill='#1976D2' d='M43.611,20.083H42V20H24v8h11.303c-0.793,2.238-2.231,4.166-4.103,5.589 c0.001-0.001,0.002-0.001,0.003-0.002l5.894,5.001C36.896,39.243,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z'/>
           </svg>
           <span>Google로 로그인</span>
+        </button>
+        
+        {/* 디버깅용 임시 버튼 */}
+        <button
+          type='button'
+          onClick={() => {
+            const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
+            const loginUrl = `${BASE_URL}/login/oauth2/code/google`;
+            console.log('직접 URL 테스트 시작');
+            alert(`리다이렉트 URL 테스트를 시작합니다.\n\n브라우저 콘솔을 확인하세요.`);
+            window.open(loginUrl, '_blank');
+          }}
+          className='w-full px-4 py-2 text-sm bg-gray-100 border rounded-md hover:bg-gray-200 text-gray-600'
+        >
+          🔧 디버그: URL 직접 테스트
         </button>
         <div className='pt-2 text-center'>
           <Link href='/' className='text-sm text-blue-600 hover:underline'>

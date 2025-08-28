@@ -21,7 +21,10 @@ export function saveAuthUser(user: User): void {
   }
   
   try {
-    console.log('사용자 정보 저장 중:', { id: user.id, email: user.email, name: user.name });
+    // 개발 환경에서만 사용자 정보 저장 로그 출력
+    if (process.env.NODE_ENV === 'development') {
+      console.log('사용자 정보 저장 중:', { id: user.id, name: user.name });
+    }
     s.setItem(AUTH_USER_KEY, JSON.stringify(user));
     s.setItem(AUTH_TIME_KEY, String(Date.now()));
     
@@ -58,10 +61,57 @@ export function clearAuth(): void {
   s.removeItem(AUTH_TIME_KEY);
   s.removeItem(ACCESS_TOKEN_KEY);
   s.removeItem('REFRESH_TOKEN');
+  console.log('인증 정보가 모두 정리되었습니다.');
+}
+
+// 토큰 만료 시 자동 로그아웃 및 로그인 페이지 리다이렉트
+export function handleTokenExpired(): void {
+  console.log('토큰이 만료되었습니다. 로그아웃 처리 중...');
+  clearAuth();
+  
+  if (typeof window !== 'undefined') {
+    // 현재 페이지가 로그인 페이지가 아닌 경우에만 리다이렉트
+    if (!window.location.pathname.includes('/login')) {
+      alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+      window.location.href = '/login';
+    }
+  }
 }
 
 export function isAuthenticated(): boolean {
   return getAuthUser() !== null && getAccessToken() !== null;
+}
+
+// 서버에서 토큰 유효성을 실제로 검증하는 함수
+export async function isAuthenticatedWithServer(): Promise<boolean> {
+  const localAuth = isAuthenticated();
+  if (!localAuth) {
+    return false;
+  }
+
+  try {
+    // 서버에 토큰 유효성 검사 요청
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_SERVER_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getAccessToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.status === 401) {
+      // 토큰이 만료된 경우 로컬 정보 정리
+      console.log('서버에서 토큰 만료 확인됨, 로컬 인증 정보 정리');
+      handleTokenExpired();
+      return false;
+    }
+
+    return response.ok;
+  } catch (error) {
+    console.error('서버 인증 확인 중 에러:', error);
+    // 네트워크 에러 등의 경우 로컬 토큰이 있으면 일단 인증된 것으로 처리
+    return localAuth;
+  }
 }
 
 // 토큰 관련 함수들
@@ -71,7 +121,10 @@ export function saveAccessToken(token: string): void {
     console.error('로컬 스토리지를 사용할 수 없습니다');
     return;
   }
-  console.log('토큰 저장 중:', token.substring(0, 20) + '...');
+  // 개발 환경에서만 토큰 저장 로그 출력
+  if (process.env.NODE_ENV === 'development') {
+    console.log('토큰 저장 중...');
+  }
   try {
     s.setItem(ACCESS_TOKEN_KEY, token);
     // 저장 확인
@@ -183,7 +236,10 @@ export function handleGoogleLoginCallback(): boolean {
   if (success === 'true' && accessToken) {
     try {
       console.log('JWT 토큰 파싱 시작...');
-      console.log('액세스 토큰 길이:', accessToken.length);
+      // 개발 환경에서만 토큰 정보 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('액세스 토큰 수신됨');
+      }
       
       // JWT 토큰 구조 확인
       const tokenParts = accessToken.split('.');
@@ -193,7 +249,10 @@ export function handleGoogleLoginCallback(): boolean {
       
       // JWT 토큰에서 사용자 정보 추출
       const tokenPayload = JSON.parse(atob(tokenParts[1]));
-      console.log('토큰 페이로드:', tokenPayload);
+      // 개발 환경에서만 토큰 페이로드 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('토큰 페이로드 파싱 완료');
+      }
       
       // 사용자 정보 구성
       const user = {
