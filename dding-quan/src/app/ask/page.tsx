@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { questionApi, professorApi, subjectsApi } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
-import { CreateQuestionResponse, Question } from '@/types/types';
+import { CreateQuestionResponse } from '@/types/types';
 
 function AskPageContent() {
   const router = useRouter();

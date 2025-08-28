@@ -711,3 +711,22 @@ export async function fetchUserPosts(page = 0, size = 10, opts?: { keyword?: str
 export const historyApi = {
   getMyPosts: fetchUserPosts,
 };
+
+// ----- AI Problem submit (custom endpoint) -----
+export async function createAiProblem(payload: { subjectId: number; file: File }): Promise<unknown> {
+  const fd = new FormData();
+  fd.append('subjectId', String(payload.subjectId));
+  fd.append('file', payload.file);
+
+  const url = `${BASE_URL}/aip/v1/problems`;
+  const res = await authenticatedFetch(url, { method: 'POST', body: fd });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Failed to submit problem: ${res.status} ${t}`);
+  }
+  try {
+    return (await res.json()) as unknown;
+  } catch {
+    return {} as unknown;
+  }
+}
