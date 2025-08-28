@@ -7,7 +7,7 @@ import { isAuthenticated } from '@/lib/auth';
 import { questionApi } from '@/lib/api';
 import type { PaginatedResponse, QuestionListItem, QuestionListParams } from '@/types/types';
 import { formatKST } from '@/lib/datetime';
-import { FileQuestionMark, MessageSquareText, History, BookOpen } from 'lucide-react';
+import { FileQuestionMark, History, BookOpen, BotMessageSquare  } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -70,9 +70,9 @@ export default function Home() {
     />
   ), []);
 
-  const boardIframe = useMemo(() => (
+  const aiAnswerIframe = useMemo(() => (
     <iframe 
-      src='/board'
+      src='/aianswer'
       className='w-full h-full border-0 pointer-events-none'
       style={{
         transform: 'scale(0.25)',
@@ -80,7 +80,7 @@ export default function Home() {
         width: '400%',
         height: '400%'
       }}
-      title='게시판 페이지 미리보기'
+      title='AI 답변 받기 페이지 미리보기'
     />
   ), []);
 
@@ -100,7 +100,7 @@ export default function Home() {
 
   return (
     <main className='mx-auto max-w-5xl px-6 py-10'>
-      <p className='text-sm text-gray-600 mb-6'>궁금한 건 무엇이든 질문해보세요!</p>
+      <p className='text-sm text-gray-600 mb-6'>모르는 문제는 질문하고 선배님과 AI 답변을 받아보세요</p>
 
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
         {/* 질문하기 페이지 미리보기 */}
@@ -131,20 +131,20 @@ export default function Home() {
           <div className='p-4 border-b bg-green-50'>
             <div className='flex items-center justify-between'>
               <div className='flex items-center gap-2 text-green-700'>
-                <MessageSquareText size={16} />
-                <span className='text-sm font-medium'>게시판</span>
+                <BotMessageSquare  size={16} />
+                <span className='text-sm font-medium'>AI 답변 받기</span>
               </div>
-              <Link href='/board' className='text-xs text-green-600 hover:underline'>
+              <Link href='/aianswer' className='text-xs text-green-600 hover:underline'>
                 이동 →
               </Link>
             </div>
           </div>
           <div className='relative h-48 bg-gray-50'>
-            {boardIframe}
+            {aiAnswerIframe}
             <Link 
-              href='/board'
+              href='/aianswer'
               className='absolute inset-0 bg-transparent hover:bg-green-50/20 transition-colors'
-              aria-label='게시판 페이지로 이동'
+              aria-label='AI 답변 받기 페이지로 이동'
             />
           </div>
         </div>
