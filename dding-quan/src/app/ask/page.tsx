@@ -2,56 +2,70 @@
 
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { questionApi, professorApi, aiApi, subjectsApi } from '@/lib/api';
+import { questionApi, professorApi, subjectsApi } from '@/lib/api';
 import { isAuthenticated } from '@/lib/auth';
 
 function AskPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [initialQuestion, setInitialQuestion] = useState<string>('');
-  const [stage, setStage] = useState<'quick' | 'detail'>('quick');
+  const [stage, setStage] = useState<'quick' | 'detail'>('detail');
   const [subject, setSubject] = useState('');
   const [professors, setProfessors] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProfessorId, setSelectedProfessorId] = useState('');
   const [loadingProf, setLoadingProf] = useState(false);
 
-  function handleQuickSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const q = String(formData.get('q') || '').trim();
-    if (!q) return;
-    setInitialQuestion(q);
-    setStage('detail');
-  }
+  // 사용하지 않는 빠른 제출 로직 제거 (상세 폼만 사용)
 
-  const [selectedFiles, setSelectedFiles] = useState<{ pdf?: File; image?: File }>({});
-  const [aiLoading, setAiLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
+  // AI 관련 로딩 상태 제거 (버튼 숨김)
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [subjectSuggestions, setSubjectSuggestions] = useState<Array<{ id: number; name: string }>>([]);
+  // 과거 검색 버튼용 상태 제거 (자동완성으로 대체)
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  // 보드와 동일한 과목 자동완성 상태
+  const [subjectInput, setSubjectInput] = useState('');
+  const [subjectResults, setSubjectResults] = useState<Array<{ id: number; name: string }>>([]);
+  const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
+  const [isLoadingSubject, setIsLoadingSubject] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const subjectBoxRef = useRef<HTMLDivElement | null>(null);
 
   async function handleDetailSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
 
-    const files: File[] = [];
-    if (selectedFiles.pdf) files.push(selectedFiles.pdf);
-    if (selectedFiles.image) files.push(selectedFiles.image);
+    const files: File[] = selectedFiles.slice();
 
     const payload = {
       title: String(formData.get('title') || '').trim(),
       content: String(formData.get('content') || '').trim(),
+      // 과목/교수는 선택 옵션. 선택하지 않으면 undefined로 전송
       subjectId: selectedSubjectId || undefined,
       professorId: selectedProfessorId ? parseInt(selectedProfessorId) : undefined,
       files: files.length > 0 ? files : undefined,
     };
-    if (!payload.title || !payload.content || !selectedSubjectId) {
-      alert('제목/과목/내용을 모두 입력해주세요.');
+    // 사용자 요구사항: 과목/교수/제목/내용 필수 입력
+    if (!payload.title || !payload.content || !selectedSubjectId || !selectedProfessorId) {
+      alert('제목, 내용, 과목, 교수님을 모두 선택/입력해주세요.');
       return;
     }
     try {
-      const created = await questionApi.create(payload);
+      setSubmitting(true);
+      if (files.length > 0) {
+        setUploadProgress(Array(files.length).fill(0));
+      }
+      const created = await questionApi.create(payload, {
+        onProgress: ({ index, percent }) => {
+          setUploadProgress((prev) => {
+            const next = prev.slice();
+            if (index >= 0) next[index] = percent;
+            return next;
+          });
+        },
+      });
       alert('질문이 등록되었습니다.');
       router.push(`/board/${created.id}`);
     } catch (e: unknown) {
@@ -61,6 +75,8 @@ function AskPageContent() {
         return;
       }
       alert(e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -84,24 +100,24 @@ function AskPageContent() {
       contentTextareaRef.current.value = content;
     }
     if (subjectParam) {
-      setSubject(subjectParam);
+      setSubjectInput(subjectParam);
     }
     if (fromAi === 'true') {
       setStage('detail');
     }
   }, [searchParams, router]);
 
-  async function handleSearchProfessors() {
-    if (!selectedSubjectId) {
-      alert('먼저 과목을 선택해주세요.');
-      return;
-    }
+  // 교수 검색 버튼 제거: 과목 선택 시 자동 로딩
+
+  // 버튼 기반 검색/변경 핸들러 제거 (자동완성/선택 로직으로 대체)
+
+
+  // 교수 목록 로드 (과목 선택 시)
+  async function loadProfessorsBySubject(subjectId: number) {
     setLoadingProf(true);
     try {
-      const list = await professorApi.getBySubjectId();
-      
-      const filteredList = list.filter((p: { id: number; name: string; subjectId?: number }) => p.subjectId == selectedSubjectId);
-      setProfessors(filteredList.map((p: { id: number; name: string }) => ({ id: p.id.toString(), name: p.name })));
+      const list = await professorApi.getBySubjectId(subjectId);
+      setProfessors(list.map((p: { id: number; name: string }) => ({ id: String(p.id), name: p.name })));
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'Authentication required') {
@@ -115,44 +131,50 @@ function AskPageContent() {
     }
   }
 
-  async function handleSearchSubjects() {
-    const keyword = subject.trim();
-    if (!keyword) {
-      setSubjectSuggestions([]);
+  // 보드와 동일한 과목 자동완성 (디바운스)
+  useEffect(() => {
+    const q = subjectInput.trim();
+    setHighlightedIndex(-1);
+    if (q.length < 1) {
+      setSubjectResults([]);
+      setShowSubjectDropdown(false);
+      setSelectedSubjectId(null);
+      setSelectedProfessorId('');
+      setProfessors([]);
       return;
     }
-    try {
-      console.log('과목 검색 시작:', keyword);
-      const allSubjects = await subjectsApi.search();
-      // 키워드로 필터링
-      const suggestions = allSubjects.filter((s: { name: string }) => 
-        s.name.toLowerCase().includes(keyword.toLowerCase())
-      );
-      console.log('과목 검색 성공:', suggestions);
-      setSubjectSuggestions(suggestions);
-    } catch (e) {
-      console.error('과목 검색 에러:', e);
-      if (e instanceof Error && e.message === 'Authentication required') {
-        console.log('Authentication required, redirecting to login');
-        window.location.href = '/login';
-        return;
+    setShowSubjectDropdown(true);
+    setIsLoadingSubject(true);
+    const t = setTimeout(async () => {
+      try {
+        const results = await subjectsApi.search(q);
+        setSubjectResults((results || []).slice(0, 20));
+      } catch (e) {
+        console.error(e);
+        setSubjectResults([]);
+      } finally {
+        setIsLoadingSubject(false);
       }
-      
-      // 500 에러인 경우 사용자에게 알림
-      if (e instanceof Error && e.message.includes('500')) {
-        console.error('서버 내부 에러 발생:', e.message);
-        alert('Subject search failed due to server error. Please try again later.');
-      }
-      
-      setSubjectSuggestions([]);
-    }
-  }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [subjectInput]);
 
-  function handleSubjectChange(next: string) {
-    setSubject(next);
+  // 바깥 클릭시 드롭다운 닫기
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!subjectBoxRef.current) return;
+      if (!subjectBoxRef.current.contains(e.target as Node)) setShowSubjectDropdown(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  async function handleSelectSubject(s: { id: number; name: string }) {
+    setSubjectInput(s.name);
+    setSelectedSubjectId(s.id);
+    setShowSubjectDropdown(false);
     setSelectedProfessorId('');
-    setSubjectSuggestions([]);
-    setSelectedSubjectId(null);
+    await loadProfessorsBySubject(s.id);
   }
 
   return (
@@ -163,42 +185,7 @@ function AskPageContent() {
       
       </div>
 
-      {/* 빠른 입력 섹션 (축소 애니메이션) */}
-      <div
-        className={`transition-all duration-500 ease-out transform-gpu overflow-hidden ${
-          stage === 'quick' ? 'max-h-40 opacity-100 scale-100' : 'max-h-0 opacity-0 scale-95'
-        }`}
-      >
-        <form onSubmit={handleQuickSubmit} className='mb-6'>
-          <label className='block text-sm text-gray-600 mb-2'>무엇이 궁금한가요?</label>
-          <div className='rounded-full border border-gray-300 bg-gray-100 px-5 py-3 shadow-sm'>
-            <input
-              name='q'
-              className='w-full bg-transparent outline-none'
-              placeholder='키워드나 질문을 입력하고 Enter'
-            />
-          </div>
-          <div className='flex gap-2 mt-3'>
-            <button
-              type='button'
-              onClick={() => {
-                const question = (document.querySelector('input[name="q"]') as HTMLInputElement)?.value || '';
-                if (question.trim()) {
-                  const params = new URLSearchParams({
-                    question: question.trim()
-                  });
-                  router.push(`/aianswer?${params.toString()}`);
-                } else {
-                  alert('먼저 질문을 입력해주세요.');
-                }
-              }}
-              className='px-4 py-2 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors'
-            >
-              AI 답변 받기
-            </button>
-          </div>
-        </form>
-      </div>
+      {/* 빠른 입력 섹션 제거: 보드와 동일 UX를 위해 상세 폼만 사용 */}
 
       {/* 상세 폼 섹션 (확장 애니메이션) */}
       <div
@@ -216,97 +203,62 @@ function AskPageContent() {
               placeholder='제목을 입력하세요'
             />
           </div>
-          {/* 1단계: 과목 검색 */}
-          <div className='space-y-3'>
-            <div className='flex items-center gap-2'>
-              <span className='flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-medium'>1</span>
-              <label className='text-sm text-gray-600 font-medium'>과목 검색</label>
-            </div>
-            <div className='flex gap-2'>
+          {/* 과목/교수 선택: 보드와 동일하게 한 줄 구성 */}
+          <div className='mb-2 text-sm text-gray-600 font-medium'>과목과 교수를 선택해주세요.</div>
+          <div className='grid gap-2 md:grid-cols-2'>
+            <div className='relative' ref={subjectBoxRef}>
               <input
-                name='subject'
-                value={subject}
-                onChange={(e) => handleSubjectChange(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearchSubjects(); } }}
-                className='flex-1 rounded-md border px-3 py-2 text-sm outline-none'
-                placeholder='과목명을 입력하세요 (예: 자료구조, 회계원리)'
+                type='text'
+                placeholder='과목을 입력하세요 (예: 자료구조)'
+                value={subjectInput}
+                onChange={(e) => setSubjectInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (!showSubjectDropdown && e.key !== 'Escape') setShowSubjectDropdown(true);
+                  if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightedIndex((i) => Math.min(i + 1, subjectResults.length - 1)); }
+                  else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightedIndex((i) => Math.max(i - 1, 0)); }
+                  else if (e.key === 'Enter') { if (highlightedIndex >= 0 && highlightedIndex < subjectResults.length) handleSelectSubject(subjectResults[highlightedIndex]); }
+                  else if (e.key === 'Escape') setShowSubjectDropdown(false);
+                }}
+                className='w-full px-4 py-3 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
               />
-              <button
-                type='button'
-                onClick={handleSearchSubjects}
-                className='px-4 py-2 rounded-md bg-green-600 text-white text-sm'
-              >
-                과목 검색
-              </button>
-            </div>
-            <datalist id='subject-suggestions'>
-              {subjectSuggestions.map((s) => (
-                <option key={s.id} value={s.name} />
-              ))}
-            </datalist>
-            
-            {subjectSuggestions.length > 0 && (
-              <div className='p-3 bg-gray-50 rounded-md border'>
-                <label className='block text-xs text-gray-500 mb-2'>검색 결과에서 과목을 선택하세요:</label>
-                <select
-                  value={selectedSubjectId || ''}
-                  onChange={(e) => {
-                    const value = e.target.value ? parseInt(e.target.value) : null;
-                    setSelectedSubjectId(value);
-                    const selected = subjectSuggestions.find(s => s.id === value);
-                    if (selected) setSubject(selected.name);
-                    setProfessors([]);
-                    setSelectedProfessorId('');
-                  }}
-                  className='w-full rounded-md border px-3 py-2 text-sm outline-none bg-white'
-                >
-                  <option value=''>과목을 선택하세요</option>
-                  {subjectSuggestions.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          {/* 2단계: 교수 검색 */}
-          <div className='space-y-3'>
-            <div className='flex items-center gap-2'>
-              <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
-                selectedSubjectId ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
-              }`}>2</span>
-              <label className={`text-sm font-medium ${
-                selectedSubjectId ? 'text-gray-600' : 'text-gray-400'
-              }`}>교수 검색</label>
-            </div>
-            
-            <div className='flex gap-2'>
-              <button
-                type='button'
-                onClick={handleSearchProfessors}
-                disabled={!selectedSubjectId || loadingProf}
-                className='px-4 py-2 rounded-md bg-blue-600 text-white text-sm disabled:bg-gray-300 disabled:cursor-not-allowed'
-              >
-                {loadingProf ? '검색 중...' : '교수 검색'}
-              </button>
-              
-              {professors.length > 0 && (
-                <select
-                  value={selectedProfessorId}
-                  onChange={(e) => setSelectedProfessorId(e.target.value)}
-                  className='flex-1 rounded-md border px-3 py-2 text-sm outline-none bg-white'
-                >
-                  <option value=''>교수를 선택하세요</option>
-                  {professors.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+              {showSubjectDropdown && (
+                <div className='absolute left-0 right-0 mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto'>
+                  {isLoadingSubject && (<div className='px-3 py-2 text-sm text-gray-500'>검색 중...</div>)}
+                  {!isLoadingSubject && (
+                    subjectResults.length > 0 ? (
+                      <ul className='py-1'>
+                        {subjectResults.map((s, idx) => (
+                          <li
+                            key={s.id}
+                            className={`px-3 py-2 text-sm text-gray-900 cursor-pointer hover:bg-gray-50 ${idx === highlightedIndex ? 'bg-gray-100' : ''}`}
+                            onMouseEnter={() => setHighlightedIndex(idx)}
+                            onMouseLeave={() => setHighlightedIndex(-1)}
+                            onClick={() => handleSelectSubject(s)}
+                          >
+                            {s.name}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className='px-3 py-2 text-sm text-gray-500'>검색 결과가 없습니다</div>
+                    )
+                  )}
+                </div>
               )}
             </div>
-            
-            {!selectedSubjectId && (
-              <p className='text-xs text-gray-400'>먼저 위에서 과목을 선택해주세요.</p>
-            )}
+            <select
+              value={selectedProfessorId}
+              onChange={(e) => setSelectedProfessorId(e.target.value)}
+              className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white'
+              disabled={!selectedSubjectId || loadingProf || professors.length === 0}
+            >
+              <option value=''>
+                {!selectedSubjectId ? '먼저 과목을 선택해주세요' : (loadingProf ? '불러오는 중...' : (professors.length === 0 ? '해당 과목의 교수가 없습니다' : '교수님을 선택하세요'))}
+              </option>
+              {professors.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className='block text-sm text-gray-600 mb-1'>문제/질문 내용</label>
@@ -318,87 +270,79 @@ function AskPageContent() {
               placeholder='질문 내용을 자세히 적어주세요'
             />
           </div>
-          <div className='flex items-center justify-between'>
-            <div className='flex gap-3 items-center'>
-              <label className='px-4 py-2 rounded-md border text-sm cursor-pointer'>
-                PDF
-                <input
-                  type='file'
-                  accept='application/pdf'
-                  className='hidden'
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    setSelectedFiles((prev) => ({ ...prev, pdf: file }));
-                  }}
-                />
-              </label>
-              <label className='px-4 py-2 rounded-md border text-sm cursor-pointer'>
-                이미지
-                <input
-                  type='file'
-                  accept='image/*'
-                  className='hidden'
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    setSelectedFiles((prev) => ({ ...prev, image: file }));
-                  }}
-                />
-              </label>
-              {(selectedFiles.pdf || selectedFiles.image) && (
-                <div className='text-xs text-gray-500'>
-                  {selectedFiles.pdf ? `PDF: ${selectedFiles.pdf.name}` : ''}
-                  {selectedFiles.pdf && selectedFiles.image ? ' / ' : ''}
-                  {selectedFiles.image ? `이미지: ${selectedFiles.image.name}` : ''}
-                </div>
-              )}
-            </div>
-            <div className='flex gap-2'>
-              <button
-                type='button'
-                onClick={() => setStage('quick')}
-                className='px-4 py-2 rounded-md border text-sm'
-              >
-                뒤로
-              </button>
-              <button type='submit' className='px-4 py-2 rounded-md bg-blue-600 text-white text-sm'>질문 등록</button>
-              <button
-                type='button'
-                onClick={async () => {
-                  try {
-                    setAiLoading(true);
-                    const contentValue = contentTextareaRef.current?.value || '';
-                    const res = await aiApi.suggestQuestion({ subject, content: contentValue });
-                    if (res.title && titleInputRef.current) {
-                      titleInputRef.current.value = res.title;
-                    }
-                    if (res.content && contentTextareaRef.current) {
-                      contentTextareaRef.current.value = res.content;
-                    }
-                  } catch {
-                    alert('AI 제안에 실패했습니다.');
-                  } finally {
-                    setAiLoading(false);
-                  }
-                }}
-                className='px-4 py-2 rounded-md bg-emerald-600 text-white text-sm disabled:opacity-50'
-                disabled={aiLoading}
-              >
-                {aiLoading ? 'AI 작성 중...' : 'AI 질문하기'}
-              </button>
-              <button
-                type='button'
-                onClick={() => {
-                  const contentValue = contentTextareaRef.current?.value || '';
-                  const params = new URLSearchParams({
-                    question: contentValue,
-                    subject: subject
+          <div className='flex items-start justify-between flex-col md:flex-row gap-3 md:gap-0'>
+            <div className='w-full md:w-auto'>
+              <div
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const files = Array.from(e.dataTransfer.files || []).filter(f => /^(image\/.*|application\/pdf)$/.test(f.type));
+                  if (files.length && !submitting) setSelectedFiles(prev => {
+                    const cur = prev || [];
+                    const remaining = Math.max(0, 10 - cur.length);
+                    const nextToAdd = files.slice(0, remaining);
+                    if (files.length > remaining) alert('최대 10개까지 첨부할 수 있습니다.');
+                    return [...cur, ...nextToAdd];
                   });
-                  router.push(`/aianswer?${params.toString()}`);
                 }}
-                className='px-4 py-2 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors'
-                disabled={!subject.trim()}
+                className='rounded-md border border-dashed p-4 text-sm text-gray-600 bg-gray-50'
               >
-                AI 답변 받기
+                <div className='flex items-center justify-between gap-3'>
+                  <div>
+                    파일 첨부 (이미지 또는 PDF)
+                    <div className='text-xs text-gray-500'>여러 개 선택 가능. 드래그앤드롭 지원.</div>
+                  </div>
+                  <label className='px-3 py-1.5 rounded-md border text-sm cursor-pointer bg-white'>
+                    파일 선택
+                    <input
+                      type='file'
+                      multiple
+                      accept='image/*,application/pdf'
+                      className='hidden'
+                      onChange={(e) => {
+                        const list = Array.from(e.target.files || []);
+                        if (list.length && !submitting) setSelectedFiles(prev => {
+                          const cur = prev || [];
+                          const remaining = Math.max(0, 10 - cur.length);
+                          const nextToAdd = list.slice(0, remaining);
+                          if (list.length > remaining) alert('최대 10개까지 첨부할 수 있습니다.');
+                          return [...cur, ...nextToAdd];
+                        });
+                        e.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+                {selectedFiles.length > 0 && (
+                  <ul className='mt-3 space-y-1 max-h-28 overflow-auto'>
+                    {selectedFiles.map((f, idx) => (
+                      <li key={idx} className='flex items-center justify-between text-xs text-gray-700'>
+                        <span className='truncate'>{f.name}</span>
+                        {typeof uploadProgress[idx] === 'number' && submitting && (
+                          <div className='ml-3 w-40 h-2 bg-gray-200 rounded-full overflow-hidden'>
+                            <div
+                              className='h-2 bg-blue-600'
+                              style={{ width: `${Math.min(100, Math.max(0, uploadProgress[idx] || 0))}%` }}
+                            />
+                          </div>
+                        )}
+                        <button
+                          type='button'
+                          disabled={submitting}
+                          onClick={() => !submitting && setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className='ml-2 text-red-600 hover:underline'
+                        >
+                          제거
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className='flex gap-2 md:items-center'>
+              <button type='submit' disabled={submitting} className='px-4 py-2 rounded-md bg-blue-600 text-white text-sm disabled:opacity-50'>
+                {submitting ? '등록 중…' : '질문하기'}
               </button>
             </div>
           </div>
@@ -419,5 +363,3 @@ export default function AskPage() {
     </Suspense>
   );
 }
-
-

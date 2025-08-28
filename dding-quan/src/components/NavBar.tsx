@@ -29,8 +29,8 @@ export default function NavBar() {
         const currentTime = Math.floor(Date.now() / 1000);
         
         console.log('토큰 만료 시간 확인:', {
-          현재시간: new Date(currentTime * 1000).toLocaleString(),
-          만료시간: payload.exp ? new Date(payload.exp * 1000).toLocaleString() : '없음',
+          현재시간: new Date(currentTime * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+          만료시간: payload.exp ? new Date(payload.exp * 1000).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '없음',
           남은시간분: payload.exp ? Math.round((payload.exp - currentTime) / 60) : 0,
           토큰일부: token.substring(0, 20) + '...'
         });
@@ -53,7 +53,9 @@ export default function NavBar() {
 
   // 토큰 상태 확인
   useEffect(() => {
-    console.log('NavBar 초기화 - 토큰 상태 확인 시작');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('NavBar 초기화 - 토큰 상태 확인 시작');
+    }
     checkTokenStatus();
     // 1분마다 토큰 상태 재확인
     const interval = setInterval(checkTokenStatus, 60000);
@@ -67,16 +69,18 @@ export default function NavBar() {
   };
 
   const handleRefreshToken = async () => {
-    console.log('🔴 handleRefreshToken 함수 시작');
+    if (process.env.NODE_ENV === 'development') console.log('🔴 handleRefreshToken 함수 시작');
     setIsRefreshing(true);
     try {
-      console.log('수동 토큰 갱신 시도...');
-      console.log('refreshAccessToken 함수 호출 직전');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('수동 토큰 갱신 시도...');
+        console.log('refreshAccessToken 함수 호출 직전');
+      }
       const success = await refreshAccessToken();
-      console.log('refreshAccessToken 함수 호출 완료, 결과:', success);
+      if (process.env.NODE_ENV === 'development') console.log('refreshAccessToken 함수 호출 완료, 결과:', success);
       
       if (success) {
-        console.log('토큰 갱신 성공 - UI 상태 업데이트');
+        if (process.env.NODE_ENV === 'development') console.log('토큰 갱신 성공 - UI 상태 업데이트');
         // 토큰 상태 즉시 재확인
         checkTokenStatus();
         // 강제로 상태 업데이트 (약간의 지연 후)
@@ -112,14 +116,25 @@ export default function NavBar() {
 
   const statusInfo = getTokenStatusInfo();
 
-  console.log('현재 tokenStatus:', tokenStatus, '버튼 표시 여부:', tokenStatus !== 'none' && (tokenStatus === 'expired' || tokenStatus === 'valid'));
+  // 운영 콘솔 노이즈 방지: 개발 모드에서만 상태 로그
+  if (process.env.NODE_ENV === 'development') {
+    console.log('현재 tokenStatus:', tokenStatus, '버튼 표시 여부:', tokenStatus !== 'none' && (tokenStatus === 'expired' || tokenStatus === 'valid'));
+  }
 
   return (
     <header className="w-full flex items-center justify-between px-6 py-4">
-      {/* 로고 */}
-      <div className="text-xl font-bold text-gray-900">
-        띵콴
-      </div>
+      {/* 로고: 클릭 시 메인 이동 */}
+      <Link href="/" className="flex items-center gap-2 select-none" aria-label="홈으로 이동">
+        {/* 이미지 로고 사용: 제공 전에는 기본 텍스트 */}
+        {/* NEXT_PUBLIC_LOGO_URL 또는 /logo.svg 사용 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={process.env.NEXT_PUBLIC_LOGO_URL || '/logo.svg'}
+          alt="QANDDING 로고"
+          className="h-8 w-auto"
+        />
+        <span className="sr-only">띵콴</span>
+      </Link>
       
       {/* 네비게이션 메뉴 */}
       <div className="flex items-center gap-3">
