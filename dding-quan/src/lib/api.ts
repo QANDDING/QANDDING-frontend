@@ -304,27 +304,35 @@ export async function unadoptAnswer(questionPostId: number): Promise<void> {
 
 // 과목 관련 API
 export async function fetchSubjects(query: string): Promise<Array<{ id: number; name: string }>> {
-  const token = getToken();
-  console.log(token);
+  console.log('🔍 fetchSubjects 호출됨 - query:', query);
 
   const params = new URLSearchParams();
   if (query) params.set('query', query);
   const url = `${BASE_URL}/api/subjects/search?${params.toString()}`;
 
-  const response = await authenticatedFetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  console.log('🌐 API URL:', url);
+  console.log('🔑 BASE_URL:', BASE_URL);
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch subjects: ${response.status}`);
+  try {
+    console.log('📡 API 호출 시작...');
+    const response = await authenticatedFetch(url, {
+      method: 'GET',
+    });
+
+    console.log('📥 API 응답 상태:', response.status, response.statusText);
+
+    if (!response.ok) {
+      console.error('❌ API 호출 실패:', response.status, response.statusText);
+      throw new Error(`Failed to fetch subjects: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ 과목 검색 결과:', data);
+    return data;
+  } catch (error) {
+    console.error('💥 fetchSubjects 에러:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  return data;
 }
 
 // 교수 관련 API
