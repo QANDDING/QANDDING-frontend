@@ -32,6 +32,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
   const [adopting, setAdopting] = useState<number | null>(null);
   const [unadopting, setUnadopting] = useState(false);
   const [deletingAnswerId, setDeletingAnswerId] = useState<number | null>(null);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserNickname, setCurrentUserNickname] = useState<string | null>(null);
   const [answering, setAnswering] = useState(false);
@@ -201,8 +202,12 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
     setOpenReplies((prev) => ({ ...prev, [k]: !prev[k] }));
   }
 
-  async function removeComment(commentId: number, answerId: number) {
-    if (!confirm('댓글을 삭제하시겠습니까?')) return;
+  async function removeComment(commentId: number, answerId: number, imageCount?: number) {
+    const c = typeof imageCount === 'number' ? imageCount : 0;
+    const warn = c > 0
+      ? `이 댓글에는 이미지 ${c}장이 첨부되어 있습니다. 삭제 후 복구할 수 없습니다.\n정말 삭제할까요?`
+      : '댓글을 삭제하시겠습니까? 삭제 후 복구할 수 없습니다.';
+    if (!confirm(warn)) return;
     try {
       await commentApi.delete(commentId);
       await loadComments(answerId);
@@ -466,7 +471,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   async function deleteAnswer(answerId: number) {
-    if (!confirm('내가 작성한 이 답변을 삭제할까요?')) return;
+    if (!confirm('이 답변을 삭제할까요? 삭제 후 복구할 수 없습니다.')) return;
     try {
       setDeletingAnswerId(answerId);
       await answerApi.delete(answerId);
@@ -476,6 +481,26 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
       alert(`삭제 중 오류가 발생했습니다. ${msg}`);
     } finally {
       setDeletingAnswerId(null);
+    }
+  }
+
+  // 내 질문 삭제
+  async function deleteQuestionPost() {
+    if (!question?.id) return;
+    if (!isAuthor) {
+      alert('질문 작성자만 삭제할 수 있습니다.');
+      return;
+    }
+    if (!confirm('이 질문을 삭제할까요? 삭제 후 복구할 수 없습니다.')) return;
+    try {
+      setDeletingQuestion(true);
+      await questionApi.delete(String(question.id));
+      alert('질문이 삭제되었습니다.');
+      window.location.href = '/board';
+    } catch {
+      alert('질문 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setDeletingQuestion(false);
     }
   }
 
@@ -636,6 +661,16 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
               className='px-3 py-1.5 rounded-md text-sm bg-emerald-600 text-white hover:bg-emerald-700'
             >
               답변달기
+            </button>
+          )}
+          {isAuthor && (
+            <button
+              type='button'
+              onClick={deleteQuestionPost}
+              disabled={deletingQuestion}
+              className='px-3 py-1.5 rounded-md text-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50'
+            >
+              {deletingQuestion ? '삭제 중…' : '질문 삭제'}
             </button>
           )}
           <Link href='/board' className='px-3 py-1.5 rounded-md text-sm bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'>
@@ -891,7 +926,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
                                 {(currentUserNickname && th.parent?.nickname && currentUserNickname === String(th.parent.nickname)) && (
                                   <button
                                     type='button'
-                                    onClick={() => removeComment(Number(th.parent.id), Number(u.id))}
+                                    onClick={() => removeComment(Number(th.parent.id), Number(u.id), Array.isArray(th.parent?.imageUrls) ? th.parent!.imageUrls!.length : 0)}
                                     className='text-xs text-red-600 hover:underline'
                                   >
                                     삭제
@@ -925,7 +960,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
                                         <div className='mt-1 text-right'>
                                           <button
                                             type='button'
-                                            onClick={() => removeComment(Number(r.id), Number(u.id))}
+                                            onClick={() => removeComment(Number(r.id), Number(u.id), Array.isArray(r.imageUrls) ? r.imageUrls.length : 0)}
                                             className='text-xs text-red-600 hover:underline'
                                           >
                                             삭제
