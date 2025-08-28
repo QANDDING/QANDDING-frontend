@@ -6,6 +6,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logout, getAccessToken, getAuthUser } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
+import { History, House, MessageSquareText, FileQuestionMark, Hourglass, Repeat2, LogOut } from "lucide-react";
+import toast from "react-hot-toast";
+
 
 export default function NavBar() {
   const router = useRouter();
@@ -101,15 +104,15 @@ export default function NavBar() {
         setTimeout(() => {
           checkTokenStatus();
         }, 100);
-        alert("토큰 갱신 성공! 🎉");
+        toast.success("토큰 갱신 성공! 🎉");
       } else {
         setTokenStatus("expired");
-        alert("토큰 갱신 실패. 다시 로그인해주세요.");
+        toast.error("토큰 갱신 실패. 다시 로그인해주세요.");
         handleLogout();
       }
     } catch (error) {
       console.error("토큰 갱신 에러:", error);
-      alert("토큰 갱신 중 에러가 발생했습니다.");
+      toast.error("토큰 갱신 중 에러가 발생했습니다.");
     } finally {
       setIsRefreshing(false);
     }
@@ -118,13 +121,17 @@ export default function NavBar() {
   const getTokenStatusInfo = () => {
     switch (tokenStatus) {
       case "valid":
-        return { color: "text-green-600", text: "✓", title: "토큰 유효" };
+        return { color: "text-green-600",  title: "토큰 유효" };
       case "expired":
-        return { color: "text-red-600", text: "⚠", title: "토큰 만료" };
+        return { color: "text-red-600", title: "토큰 만료" };
       case "none":
-        return { color: "text-gray-400", text: "✗", title: "토큰 없음" };
+        return { color: "text-gray-400",  title: "토큰 없음" };
       default:
-        return { color: "text-yellow-600", text: "⏳", title: "확인 중" };
+        return {
+          color: "text-yellow-600",
+          text: <Hourglass />,
+          title: "확인 중",
+        };
     }
   };
 
@@ -149,9 +156,9 @@ export default function NavBar() {
         className="flex items-center gap-2 select-none"
         aria-label="홈으로 이동"
       >
-        <Image 
-          src="/logo.png" 
-          alt="띵콴 로고" 
+        <Image
+          src="/logo.png"
+          alt="띵콴 로고"
           width={32}
           height={32}
           className="h-8 w-auto"
@@ -163,27 +170,27 @@ export default function NavBar() {
       <div className="flex items-center gap-3">
         <Link
           href="/"
-          className="rounded-full bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          home
+          <House />
         </Link>
         <Link
           href="/ask"
-          className="rounded-full bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          질문
+          <FileQuestionMark />
         </Link>
         <Link
           href="/board"
-          className="rounded-full bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          게시판
+          <MessageSquareText />
         </Link>
         <Link
           href="/history"
-          className="rounded-full bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
+          className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          히스토리
+          <History />
         </Link>
 
         {/* 토큰 상태 및 갱신 버튼 */}
@@ -198,7 +205,7 @@ export default function NavBar() {
           <button
             onClick={handleRefreshToken}
             disabled={isRefreshing}
-            className={`px-3 py-1 text-xs rounded-full transition-colors ${
+            className={`px-3 py-1 text-xs rounded-lg transition-colors ${
               isRefreshing
                 ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                 : tokenStatus === "expired"
@@ -207,16 +214,16 @@ export default function NavBar() {
             }`}
             title={isRefreshing ? "갱신 중..." : "토큰 갱신"}
           >
-            {isRefreshing ? "⏳" : "🔄"}
+            {isRefreshing ? <Hourglass /> : <Repeat2 />}
           </button>
         </div>
 
         {/* 로그아웃 버튼 */}
         <button
           onClick={handleLogout}
-          className="rounded-full bg-red-100 text-red-700 px-4 py-1 text-sm font-medium hover:bg-red-200"
+          className="rounded-lg bg-red-100 text-red-700 px-4 py-1 text-sm font-medium hover:bg-red-200"
         >
-          로그아웃
+          <LogOut />
         </button>
       </div>
     </header>
