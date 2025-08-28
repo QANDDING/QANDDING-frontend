@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '@/lib/auth';
 import { questionApi } from '@/lib/api';
 import type { PaginatedResponse, QuestionListItem, QuestionListParams } from '@/types/types';
 import { formatKST } from '@/lib/datetime';
+import { FileQuestionMark, MessageSquareText, History, BookOpen } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
@@ -53,27 +54,136 @@ export default function Home() {
       router.push('/login');
     }
   }, [router]);
+
+  // iframe 컴포넌트들을 메모이제이션하여 한 번만 생성
+  const askIframe = useMemo(() => (
+    <iframe 
+      src='/ask'
+      className='w-full h-full border-0 pointer-events-none'
+      style={{
+        transform: 'scale(0.25)',
+        transformOrigin: 'top left',
+        width: '400%',
+        height: '400%'
+      }}
+      title='질문하기 페이지 미리보기'
+    />
+  ), []);
+
+  const boardIframe = useMemo(() => (
+    <iframe 
+      src='/board'
+      className='w-full h-full border-0 pointer-events-none'
+      style={{
+        transform: 'scale(0.25)',
+        transformOrigin: 'top left',
+        width: '400%',
+        height: '400%'
+      }}
+      title='게시판 페이지 미리보기'
+    />
+  ), []);
+
+  const historyIframe = useMemo(() => (
+    <iframe 
+      src='/history'
+      className='w-full h-full border-0 pointer-events-none'
+      style={{
+        transform: 'scale(0.25)',
+        transformOrigin: 'top left',
+        width: '400%',
+        height: '400%'
+      }}
+      title='히스토리 페이지 미리보기'
+    />
+  ), []);
+
   return (
     <main className='mx-auto max-w-5xl px-6 py-10'>
       <p className='text-sm text-gray-600 mb-6'>궁금한 건 무엇이든 질문해보세요!</p>
 
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-        <div className='md:col-span-1 space-y-8'>
-          <Link
-            href='/ask'
-            className='h-56 rounded-3xl bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center text-gray-700'>
-            질문하기
-          </Link>
-          <Link
-            href='/history'
-            className='h-56 rounded-3xl bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center text-gray-700'>
-            히스토리
-          </Link>
+      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+        {/* 질문하기 페이지 미리보기 */}
+        <div className='group rounded-2xl bg-white border hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden'>
+          <div className='p-4 border-b bg-blue-50'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2 text-blue-700'>
+                <FileQuestionMark size={16} />
+                <span className='text-sm font-medium'>질문하기</span>
+              </div>
+              <Link href='/ask' className='text-xs text-blue-600 hover:underline'>
+                이동 →
+              </Link>
+            </div>
+          </div>
+          <div className='relative h-48 bg-gray-50'>
+            {askIframe}
+            <Link 
+              href='/ask'
+              className='absolute inset-0 bg-transparent hover:bg-blue-50/20 transition-colors'
+              aria-label='질문하기 페이지로 이동'
+            />
+          </div>
         </div>
-        <div className='rounded-3xl bg-white border flex flex-col md:col-span-1'>
-          <div className='px-5 py-4 border-b flex items-center justify-between'>
-            <h2 className='text-sm font-semibold text-gray-900'>게시판 미리보기</h2>
-            <Link href='/board' className='text-xs text-blue-600 hover:underline'>전체 보기</Link>
+
+        {/* 게시판 페이지 미리보기 */}
+        <div className='group rounded-2xl bg-white border hover:border-green-300 hover:shadow-lg transition-all duration-200 overflow-hidden'>
+          <div className='p-4 border-b bg-green-50'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2 text-green-700'>
+                <MessageSquareText size={16} />
+                <span className='text-sm font-medium'>게시판</span>
+              </div>
+              <Link href='/board' className='text-xs text-green-600 hover:underline'>
+                이동 →
+              </Link>
+            </div>
+          </div>
+          <div className='relative h-48 bg-gray-50'>
+            {boardIframe}
+            <Link 
+              href='/board'
+              className='absolute inset-0 bg-transparent hover:bg-green-50/20 transition-colors'
+              aria-label='게시판 페이지로 이동'
+            />
+          </div>
+        </div>
+
+        {/* 히스토리 페이지 미리보기 */}
+        <div className='group rounded-2xl bg-white border hover:border-purple-300 hover:shadow-lg transition-all duration-200 overflow-hidden'>
+          <div className='p-4 border-b bg-purple-50'>
+            <div className='flex items-center justify-between'>
+              <div className='flex items-center gap-2 text-purple-700'>
+                <History size={16} />
+                <span className='text-sm font-medium'>히스토리</span>
+              </div>
+              <Link href='/history' className='text-xs text-purple-600 hover:underline'>
+                이동 →
+              </Link>
+            </div>
+          </div>
+          <div className='relative h-48 bg-gray-50'>
+            {historyIframe}
+            <Link 
+              href='/history'
+              className='absolute inset-0 bg-transparent hover:bg-purple-50/20 transition-colors'
+              aria-label='히스토리 페이지로 이동'
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 게시판 미리보기 섹션 */}
+      <div className='mt-12'>
+        <div className='rounded-2xl bg-white border'>
+          <div className='px-6 py-4 border-b flex items-center justify-between'>
+            <h2 className='text-lg font-semibold text-gray-900 flex items-center gap-2'>
+              <BookOpen size={20} />
+              최근 질문들
+            </h2>
+            <Link href='/board' className='text-sm text-blue-600 hover:underline flex items-center gap-1'>
+              전체 보기 →
+            </Link>
           </div>
           <div>
             {loading ? (
