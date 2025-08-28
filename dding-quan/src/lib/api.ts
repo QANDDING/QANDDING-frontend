@@ -1,15 +1,4 @@
-import {
-  Question,
-  CreateQuestionRequest,
-  Answer,
-  CreateAnswerRequest,
-  PaginatedResponse,
-  QuestionListParams,
-  QuestionListItem,
-  User,
-  Professor,
-  UserPostsResponse,
-} from '../types/types'
+import { Question, CreateQuestionRequest, Answer, CreateAnswerRequest, PaginatedResponse, QuestionListParams, QuestionListItem, User, Professor, UserPostsResponse } from '../types/types';
 import { getAccessToken, removeAccessToken, handleTokenExpired, saveAccessToken } from './auth';
 
 // API 기본 설정
@@ -18,8 +7,6 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_SERVER_URL;
 if (process.env.NODE_ENV === 'development') {
   console.log('API BASE_URL 설정됨');
 }
-
-
 
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
@@ -47,7 +34,7 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}, isRetr
 
   // 기본 헤더 설정
   const defaultHeaders: Record<string, string> = {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
   };
 
@@ -67,7 +54,7 @@ const authenticatedFetch = async (url: string, options: RequestInit = {}, isRetr
   // 401 에러 처리 - 리프레시 토큰으로 재시도
   if (response.status === 401 && !isRetry) {
     console.log('401 에러 발생, 리프레시 토큰으로 재시도...');
-    
+
     const refreshSuccess = await refreshAccessToken();
     if (refreshSuccess) {
       console.log('토큰 갱신 성공, API 재호출');
@@ -124,15 +111,11 @@ function makeS3Key(prefix: string, file: File): string {
   const ts = Date.now();
   const rand = Math.random().toString(36).slice(2, 8);
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const p = prefix.replace(/\/+$/,'');
+  const p = prefix.replace(/\/+$/, '');
   return `${p}/${ts}-${rand}-${safeName}`;
 }
 
-async function presignAndUpload(
-  prefix: string,
-  files: File[] = [],
-  onFileProgress?: (info: { index: number; file: File; percent: number }) => void,
-): Promise<string[]> {
+async function presignAndUpload(prefix: string, files: File[] = [], onFileProgress?: (info: { index: number; file: File; percent: number }) => void): Promise<string[]> {
   const urls: string[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
@@ -162,9 +145,9 @@ export async function fetchQuestions(params: QuestionListParams = {}): Promise<P
 
   const queryString = searchParams.toString();
   const url = queryString ? `${BASE_URL}/api/questions?${queryString}` : `${BASE_URL}/api/questions`;
-  
+
   console.log('질문 목록 API 호출:', url);
-  
+
   const response = await authenticatedFetch(url, { method: 'GET' });
 
   console.log('질문 목록 API 응답:', response.status, response.statusText);
@@ -193,10 +176,7 @@ export async function fetchDetailQuestion(id: string): Promise<Question> {
   return data;
 }
 
-export async function createQuestion(
-  questionData: CreateQuestionRequest,
-  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
-): Promise<Question> {
+export async function createQuestion(questionData: CreateQuestionRequest, opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void }): Promise<Question> {
   // Swagger: POST /api/questions expects JSON with imageUrls (presigned upload)
   let imageUrls: string[] | undefined = undefined;
   if (questionData.files && questionData.files.length > 0) {
@@ -233,7 +213,7 @@ export async function deleteQuestion(id: string): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/questions/${id}`, {
     method: 'DELETE',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   });
@@ -245,7 +225,11 @@ export async function deleteQuestion(id: string): Promise<void> {
 
 // 답변 관련 API
 // New: combined answers feed (AI + users paginated)
-export async function fetchCombinedAnswers(questionPostId: number, page = 0, size = 3): Promise<{
+export async function fetchCombinedAnswers(
+  questionPostId: number,
+  page = 0,
+  size = 3
+): Promise<{
   ai?: Answer | null;
   users: PaginatedResponse<Answer> | { content: Answer[]; totalElements: number; totalPages: number; size: number; number: number; first: boolean; last: boolean };
 }> {
@@ -265,10 +249,7 @@ export async function deleteAnswerById(id: number): Promise<void> {
   }
 }
 
-export async function createAnswer(
-  answerData: CreateAnswerRequest & { title?: string },
-  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
-): Promise<Answer> {
+export async function createAnswer(answerData: CreateAnswerRequest & { title?: string }, opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void }): Promise<Answer> {
   // Swagger: POST /api/answers expects JSON with imageUrls
   let imageUrls: string[] | undefined = undefined;
   if (answerData.files && answerData.files.length > 0) {
@@ -302,7 +283,9 @@ export async function adoptAnswer(answerPostId: number): Promise<void> {
   const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection?${qs}`, { method: 'POST' });
   if (!response.ok) {
     let msg = '';
-    try { msg = await response.text(); } catch {}
+    try {
+      msg = await response.text();
+    } catch {}
     throw new Error(`Failed to adopt answer: ${response.status} ${msg || ''}`.trim());
   }
 }
@@ -312,7 +295,9 @@ export async function unadoptAnswer(questionPostId: number): Promise<void> {
   const response = await authenticatedFetch(`${BASE_URL}/api/answers/selection?${qs}`, { method: 'DELETE' });
   if (!response.ok) {
     let msg = '';
-    try { msg = await response.text(); } catch {}
+    try {
+      msg = await response.text();
+    } catch {}
     throw new Error(`Failed to unadopt answer: ${response.status} ${msg || ''}`.trim());
   }
 }
@@ -321,7 +306,7 @@ export async function unadoptAnswer(questionPostId: number): Promise<void> {
 export async function fetchSubjects(query: string): Promise<Array<{ id: number; name: string }>> {
   const token = getToken();
   console.log(token);
-  
+
   const params = new URLSearchParams();
   if (query) params.set('query', query);
   const url = `${BASE_URL}/api/subjects/search?${params.toString()}`;
@@ -329,9 +314,9 @@ export async function fetchSubjects(query: string): Promise<Array<{ id: number; 
   const response = await authenticatedFetch(url, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    }
+    },
   });
 
   if (!response.ok) {
@@ -353,9 +338,9 @@ export async function fetchProfessorsBySubject(subjectId: number): Promise<Profe
   const response = await authenticatedFetch(url, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    }
+    },
   });
 
   if (!response.ok) {
@@ -374,9 +359,9 @@ export async function fetchUserProfile(): Promise<User> {
   const response = await authenticatedFetch(`${BASE_URL}/api/users/me`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    }
+    },
   });
 
   if (!response.ok) {
@@ -392,14 +377,14 @@ export async function fetchUserProfile(): Promise<User> {
 export async function completeUserProfile(profileData: { nickname: string; grade: string; major: string }): Promise<User> {
   const token = getToken();
   if (!token) throw new Error('Authentication required');
-  
+
   const response = await authenticatedFetch(`${BASE_URL}/api/users/complete-profile`, {
     method: 'PUT',
     body: JSON.stringify(profileData),
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    }
+    },
   });
 
   if (!response.ok) {
@@ -433,13 +418,13 @@ export async function logout(): Promise<void> {
   const response = await authenticatedFetch(`${BASE_URL}/api/auth/logout`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-    }
+    },
   });
 
   removeAccessToken();
-  
+
   if (!response.ok) {
     console.warn('Logout request failed, but token was removed locally');
   }
@@ -448,6 +433,7 @@ export async function logout(): Promise<void> {
 // 리프레시 토큰으로 액세스 토큰 갱신
 export async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = localStorage.getItem('REFRESH_TOKEN');
+  const accessToken = getAccessToken(); // 현재 액세스 토큰 가져오기
 
   if (!refreshToken) {
     console.log('리프레시 토큰이 없습니다.');
@@ -455,13 +441,19 @@ export async function refreshAccessToken(): Promise<boolean> {
   }
 
   try {
-    // 리프레시 토큰만 사용 (만료된 액세스 토큰 사용하지 않음)
+    // 액세스 토큰이 있으면 헤더에 포함, 없으면 헤더에서 제외
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    // 리프레시 토큰으로 토큰 갱신 요청
     const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
-     headers: {
-      'Authorization': `Bearer ${refreshToken}`,
-      'Content-Type': 'application/json',
-    },
+      headers,
       body: JSON.stringify({ refreshToken }),
     });
 
@@ -471,10 +463,9 @@ export async function refreshAccessToken(): Promise<boolean> {
       return false;
     }
 
-    const data: { accessToken?: string; refreshToken?: string } = await response.json();
-    console.log(data);
-    console.log(data.accessToken);
-    console.log(data.refreshToken);
+    const data: { accessToken?: string; refreshToken?: string; message?: string } = await response.json();
+    console.log('토큰 갱신 응답:', data);
+
     if (data.accessToken) {
       saveAccessToken(data.accessToken);
       if (data.refreshToken) {
@@ -499,9 +490,9 @@ export async function checkAuth(): Promise<boolean> {
     const response = await authenticatedFetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
-      }
+      },
     });
 
     return response.ok;
@@ -510,67 +501,17 @@ export async function checkAuth(): Promise<boolean> {
   }
 }
 
+// startGoogleLogin 함수 내부
 export function startGoogleLogin(): void {
   if (typeof window !== 'undefined') {
-    const loginUrl = `${BASE_URL}/login`;
-    // 개발 환경에서만 상세 로그 출력
-    if (process.env.NODE_ENV === 'development') {
-      console.log('구글 로그인 시작:', {
-        currentUrl: window.location.href,
-        userAgent: navigator.userAgent.substring(0, 50) + '...',
-        baseUrlSet: !!BASE_URL
-      });
-    } else {
-      console.log('구글 로그인 시작');
-    }
-    
-    // BASE_URL이 제대로 설정되었는지 확인
-    if (!BASE_URL) {
-      console.error('BASE_URL이 설정되지 않았습니다!');
-      alert('서버 URL이 설정되지 않았습니다. 관리자에게 문의하세요.');
-      return;
-    }
-    
-    // URL이 ASCII 문자만 포함하는지 확인
-    const isValidUrl = /^[!-~\s]*$/.test(loginUrl);
-    if (isValidUrl) {
+    const loginUrl = `${BASE_URL}/oauth2/authorization/google`;
+
+    try {
       console.log('구글 OAuth2 페이지로 리다이렉트 중...');
-      // 개발 환경에서만 리다이렉트 URL 로그 출력
-      if (process.env.NODE_ENV === 'development') {
-        console.log('리다이렉트 URL:', loginUrl);
-      }
-      
-      try {
-        // 여러 리다이렉트 방법 시도
-        console.log('방법 1: window.location.href 시도');
-        window.location.href = loginUrl;
-        
-        // 대안 방법들을 순차적으로 시도
-        setTimeout(() => {
-          if (window.location.href.includes('/login')) {
-            console.log('방법 2: window.location.assign 시도');
-            window.location.assign(loginUrl);
-            
-            setTimeout(() => {
-              if (window.location.href.includes('/login')) {
-                console.log('방법 3: window.open 시도');
-                const popup = window.open(loginUrl, '_self');
-                if (!popup) {
-                  console.error('팝업이 차단되었습니다');
-                  alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                }
-              }
-            }, 1000);
-          }
-        }, 1000);
-        
-      } catch (error) {
-        console.error('리다이렉트 중 에러 발생:', error);
-        alert('페이지 이동 중 오류가 발생했습니다.');
-      }
-    } else {
-      console.error('Invalid URL contains non-ASCII characters:', loginUrl);
-      alert('Login URL is invalid. Please contact support.');
+      window.location.href = loginUrl;
+    } catch (error) {
+      console.error('리다이렉트 중 에러 발생:', error);
+      alert('페이지 이동 중 오류가 발생했습니다.');
     }
   }
 }
@@ -598,7 +539,11 @@ type ThreadItem = {
   replies: Array<{ id: number; nickname?: string; content: string; createdAt?: string; imageUrls?: string[] }>;
 };
 
-export async function fetchComments(answerPostId: number, page = 0, size = 10): Promise<{ content: ThreadItem[]; page?: number; size?: number; totalElements?: number; totalPages?: number; last?: boolean }> {
+export async function fetchComments(
+  answerPostId: number,
+  page = 0,
+  size = 10
+): Promise<{ content: ThreadItem[]; page?: number; size?: number; totalElements?: number; totalPages?: number; last?: boolean }> {
   const params = new URLSearchParams({ answerPostId: String(answerPostId), page: String(page), size: String(size) });
   const res = await authenticatedFetch(`${BASE_URL}/api/comments?${params.toString()}`, { method: 'GET' });
   if (!res.ok) {
@@ -610,7 +555,7 @@ export async function fetchComments(answerPostId: number, page = 0, size = 10): 
 
 export async function createComment(
   data: { answerPostId: number; content: string; files?: File[] },
-  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
+  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void }
 ): Promise<void> {
   let imageUrls: string[] | undefined = undefined;
   if (data.files && data.files.length > 0) {
@@ -630,7 +575,7 @@ export async function createComment(
 
 export async function createReply(
   data: { parentCommentId: number; content: string; files?: File[] },
-  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void },
+  opts?: { onProgress?: (info: { index: number; file: File; percent: number }) => void }
 ): Promise<void> {
   let imageUrls: string[] | undefined = undefined;
   if (data.files && data.files.length > 0) {
@@ -682,7 +627,7 @@ export const aiApi = {
     return generateAIResponse({
       subject: data.subject,
       content: data.content,
-      type: 'question_suggestion'
+      type: 'question_suggestion',
     });
   },
 };
@@ -693,11 +638,7 @@ export const authApi = {
   checkAuth,
 };
 // ----- User posts (history) -----
-export async function fetchUserPosts(
-  page = 0,
-  size = 10,
-  opts?: { keyword?: string; postType?: 'QUESTION' | 'ANSWER' }
-): Promise<UserPostsResponse> {
+export async function fetchUserPosts(page = 0, size = 10, opts?: { keyword?: string; postType?: 'QUESTION' | 'ANSWER' }): Promise<UserPostsResponse> {
   const sp = new URLSearchParams();
   sp.set('page', String(page));
   if (typeof size === 'number') sp.set('size', String(size));
