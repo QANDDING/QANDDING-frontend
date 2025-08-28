@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { logout, getAccessToken, getAuthUser } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
-import { Hourglass, Repeat2 } from "lucide-react";
+import { History, House, MessageSquareText, FileQuestionMark, Hourglass, Repeat2, LogOut } from "lucide-react";
 import toast from "react-hot-toast";
 
 
@@ -172,25 +172,25 @@ export default function NavBar() {
           href="/"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          home
+          <House />
         </Link>
         <Link
           href="/ask"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          질문
+          <FileQuestionMark />
         </Link>
         <Link
           href="/board"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          게시판
+          <MessageSquareText />
         </Link>
         <Link
           href="/history"
           className="rounded-lg bg-blue-100 text-blue-700 px-4 py-1 text-sm font-medium hover:bg-blue-200"
         >
-          히스토리
+          <History />
         </Link>
 
         {/* 토큰 상태 및 갱신 버튼 */}
@@ -223,7 +223,7 @@ export default function NavBar() {
           onClick={handleLogout}
           className="rounded-lg bg-red-100 text-red-700 px-4 py-1 text-sm font-medium hover:bg-red-200"
         >
-          로그아웃
+          <LogOut />
         </button>
       </div>
     </header>
