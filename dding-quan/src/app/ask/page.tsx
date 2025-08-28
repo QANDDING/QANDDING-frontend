@@ -47,44 +47,98 @@ function AskPageContent() {
       if (contentTextareaRef.current) contentTextareaRef.current.value = decodeURIComponent(content);
 
       // 기존 질문 정보를 가져와서 과목과 교수 정보도 설정
-      loadExistingQuestionData(id);
+      loadExistingQuestion(id);
     }
   }, [searchParams]);
 
-  // 기존 질문 데이터 로드
-  async function loadExistingQuestionData(questionId: string) {
+  // 기존 질문 데이터 로드 (수정 모드일 때)
+  async function loadExistingQuestion(id: string) {
     try {
-      const question = await questionApi.getById(questionId);
+      console.log('=== 기존 질문 로드 시작 ===');
+      console.log('질문 ID:', id);
+
+      const question = await questionApi.getById(id);
+      console.log('API 응답:', question);
+
       if (question) {
-        // 과목 정보 설정 - API 응답에서 실제 필드명 사용
-        const raw = question as unknown as Record<string, unknown>;
-        if (raw['subjectId']) {
-          setSelectedSubjectId(raw['subjectId'] as number);
-          // 과목명도 설정
-          if (raw['subjectName']) {
-            setSubjectInput(raw['subjectName'] as string);
-          }
+        // ref가 준비될 때까지 기다리기
+        let retryCount = 0;
+        while ((!titleInputRef.current || !contentTextareaRef.current) && retryCount < 10) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          retryCount++;
         }
 
-        // 교수 정보 설정
-        if (raw['professorId']) {
-          setSelectedProfessorId(raw['professorId'].toString());
-          // 교수 목록에서 해당 교수 찾기
-          if (professors.length > 0) {
-            const professor = professors.find((p) => p.id === raw['professorId']?.toString());
-            if (professor) {
-              setSelectedProfessorId(professor.id);
+        if (!titleInputRef.current || !contentTextareaRef.current) {
+          console.error('ref가 준비되지 않음');
+          return;
+        }
+
+        // 제목과 내용 설정
+        titleInputRef.current.value = question.title || '';
+        contentTextareaRef.current.value = question.content || '';
+        console.log('제목과 내용 설정 완료:', question.title, question.content);
+
+        // 과목 설정 - API 응답 구조에 맞춰 수정
+        const raw = question as unknown as Record<string, unknown>;
+        console.log('raw 데이터:', raw);
+
+        // subjectName이 있으면 과목 입력란에 설정
+        if (raw['subjectName']) {
+          console.log('과목명 발견:', raw['subjectName']);
+          setSubjectInput(raw['subjectName'] as string);
+
+          // 과목명으로 과목 검색하여 subjectId 찾기
+          try {
+            const subjectResults = await subjectsApi.search(raw['subjectName'] as string);
+            console.log('과목 검색 결과:', subjectResults);
+
+            if (subjectResults && subjectResults.length > 0) {
+              // 정확히 일치하는 과목 찾기
+              const exactMatch = subjectResults.find((s) => s.name === raw['subjectName']);
+              if (exactMatch) {
+                console.log('과목 매칭 성공:', exactMatch);
+                setSelectedSubjectId(exactMatch.id);
+
+                // 교수명으로 교수 찾기
+                if (raw['professorName']) {
+                  console.log('교수명 발견:', raw['professorName']);
+                  try {
+                    const professors = await professorApi.getBySubjectId(exactMatch.id);
+                    console.log('교수 목록:', professors);
+
+                    const professorMatch = professors.find((p) => p.name === raw['professorName']);
+                    if (professorMatch) {
+                      console.log('교수 매칭 성공:', professorMatch);
+                      setSelectedProfessorId(String(professorMatch.id));
+                    } else {
+                      console.log('교수 매칭 실패');
+                    }
+                  } catch (e) {
+                    console.error('교수 정보 로드 실패:', e);
+                  }
+                }
+              } else {
+                console.log('과목 매칭 실패');
+              }
             }
+          } catch (e) {
+            console.error('과목 검색 실패:', e);
           }
+        } else {
+          console.log('subjectName이 없음');
         }
 
         // 기존 이미지 URL 설정
         if (raw['imageUrls'] && Array.isArray(raw['imageUrls'])) {
+          console.log('이미지 URL 설정:', raw['imageUrls']);
           setExistingImageUrls(raw['imageUrls'] as string[]);
         }
+
+        console.log('=== 기존 질문 로드 완료 ===');
       }
-    } catch (error) {
-      console.error('기존 질문 정보 로드 실패:', error);
+    } catch (e) {
+      console.error('기존 질문 로드 실패:', e);
+      alert('기존 질문을 불러오는데 실패했습니다.');
     }
   }
 

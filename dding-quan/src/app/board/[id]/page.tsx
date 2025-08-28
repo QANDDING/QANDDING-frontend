@@ -584,6 +584,18 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
   const isAuthorById = !!(currentUserId && getQuestionAuthorId(question) === String(currentUserId));
   const isAuthorByNickname = !!(currentUserNickname && getQuestionAuthorNickname(question) === String(currentUserNickname));
   const isAuthor = isAuthorById || isAuthorByNickname;
+
+  // 디버깅을 위한 로그 추가
+  console.log('=== 작성자 식별 디버깅 ===');
+  console.log('currentUserId:', currentUserId);
+  console.log('currentUserNickname:', currentUserNickname);
+  console.log('question:', question);
+  console.log('getQuestionAuthorId(question):', getQuestionAuthorId(question));
+  console.log('getQuestionAuthorNickname(question):', getQuestionAuthorNickname(question));
+  console.log('isAuthorById:', isAuthorById);
+  console.log('isAuthorByNickname:', isAuthorByNickname);
+  console.log('isAuthor:', isAuthor);
+  console.log('========================');
   const isAnswerOwner = (ans: { authorNickname?: string; nickname?: string }) => {
     const nick = (ans?.authorNickname ?? ans?.nickname ?? '').toString().trim();
     return !!(currentUserNickname && nick && currentUserNickname === nick);
