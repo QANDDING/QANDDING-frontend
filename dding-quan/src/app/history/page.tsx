@@ -7,6 +7,7 @@ import { isAuthenticated } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatKST } from '@/lib/datetime';
 
+
 type HistoryItem = {
   postType: 'QUESTION' | 'ANSWER';
   postId: number;
