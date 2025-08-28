@@ -59,6 +59,10 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
   const [replyProgress, setReplyProgress] = useState<Record<string, number[]>>({});
   const [commentsPage, setCommentsPage] = useState<Record<string, number>>({});
   const [commentsHasMore, setCommentsHasMore] = useState<Record<string, boolean>>({});
+  // 댓글 총개수(서버 totalElements) 캐시
+  const [commentTotals, setCommentTotals] = useState<Record<string, number>>({});
+  // 해시 스크롤 1회만 수행
+  const hashHandledRef = useRef(false);
 
   // using global formatKST
 
@@ -112,6 +116,10 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
       const size = res.size ?? 10;
       const last = typeof res.last === 'boolean' ? res.last : ((res.content?.length || 0) < size);
       setCommentsHasMore((prev) => ({ ...prev, [key]: !last }));
+      // 서버 totalElements로 총 댓글 수 반영
+      if (typeof res.totalElements === 'number') {
+        setCommentTotals((prev) => ({ ...prev, [key]: res.totalElements as number }));
+      }
     } finally {
       setLoadingComments((prev) => ({ ...prev, [key]: false }));
     }
@@ -142,6 +150,11 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
       setCommentFiles((prev) => ({ ...prev, [k]: [] }));
       setCommentProgress((prev) => ({ ...prev, [k]: [] }));
       await loadComments(answerId);
+      // 작성 후 최신 총개수 갱신
+      try {
+        const c = await commentApi.list(answerId, 0, 1);
+        if (typeof c.totalElements === 'number') setCommentTotals((prev) => ({ ...prev, [String(answerId)]: c.totalElements as number }));
+      } catch {}
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       alert(`댓글 등록 중 오류가 발생했습니다. ${msg}`);
@@ -173,6 +186,10 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
       setReplyProgress((prev) => ({ ...prev, [String(parentCommentId)]: [] }));
       setOpenReplies((prev) => ({ ...prev, [String(parentCommentId)]: true }));
       await loadComments(answerId);
+      try {
+        const c = await commentApi.list(answerId, 0, 1);
+        if (typeof c.totalElements === 'number') setCommentTotals((prev) => ({ ...prev, [String(answerId)]: c.totalElements as number }));
+      } catch {}
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       alert(`대댓글 등록 중 오류가 발생했습니다. ${msg}`);
@@ -189,6 +206,10 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
     try {
       await commentApi.delete(commentId);
       await loadComments(answerId);
+      try {
+        const c = await commentApi.list(answerId, 0, 1);
+        if (typeof c.totalElements === 'number') setCommentTotals((prev) => ({ ...prev, [String(answerId)]: c.totalElements as number }));
+      } catch {}
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       alert(`삭제 중 오류가 발생했습니다. ${msg}`);
@@ -292,24 +313,43 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
         questionApi.getById(id),
         answerApi.getCombined(Number(id), 0, 3),
       ]);
-      // 매핑: API 질문 → 로컬 Question 타입
-      const qMapped = q as unknown as import('@/types/types').Question;
+      // 매핑: API 질문 → 로컬 Question 타입 (원본 필드 보존하여 작성자 식별 신뢰성 향상)
+      const raw = q as unknown as Record<string, unknown>;
+      const authorObj = raw['author'] as Record<string, unknown> | undefined;
+      const writerObj = raw['writer'] as Record<string, unknown> | undefined;
+      const ownerObj = raw['owner'] as Record<string, unknown> | undefined;
+      const authorNick = (raw['authorNickname'] as string)
+        ?? (authorObj?.['nickname'] as string)
+        ?? (writerObj?.['nickname'] as string)
+        ?? (ownerObj?.['nickname'] as string);
       setQuestion({
-        id: String(qMapped.id),
-        title: qMapped.title,
-        subject: qMapped.subject,
-        subjectName: undefined,
-        content: qMapped.content,
-        isAdopted: Boolean(qMapped.isAdopted ?? false),
-        imageUrls: undefined,
-        files: Array.isArray(qMapped.files) ? qMapped.files : undefined,
-        authorNickname: qMapped.authorName,
-        createdAt: qMapped.createdAt,
-      });
+        ...(raw || {}),
+        id: String(raw['id']),
+        title: raw['title'] as string,
+        subject: raw['subject'] as string,
+        subjectName: raw['subjectName'] as string | undefined,
+        content: raw['content'] as string,
+        isAdopted: Boolean((raw['isAdopted'] as boolean | undefined) ?? (raw['adopted'] as boolean | undefined) ?? false),
+        imageUrls: Array.isArray(raw['imageUrls']) ? (raw['imageUrls'] as string[]) : undefined,
+        files: Array.isArray(raw['files']) ? (raw['files'] as Array<{ url: string; filename?: string }>) : undefined,
+        authorNickname: authorNick,
+        createdAt: raw['createdAt'] as string,
+      } as unknown as Question);
       setAnswers(a as Combined);
       const users = a?.users || {};
       setUserPage(users.number ?? 0);
       setUserHasMore(hasMoreUsers(users));
+      // 초기 댓글 총개수 로드 (각 답변별 1페이지만 호출)
+      try {
+        const list = (users.content || []) as Array<{ id: string }>;
+        for (const u of list) {
+          const aid = Number(u.id);
+          if (!Number.isFinite(aid)) continue;
+          commentApi.list(aid, 0, 1).then((c) => {
+            if (typeof c.totalElements === 'number') setCommentTotals((prev) => ({ ...prev, [String(aid)]: c.totalElements as number }));
+          }).catch(() => {});
+        }
+      } catch {}
     } finally {
       setLoading(false);
     }
@@ -347,12 +387,14 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
   // 해시로 특정 답변으로 스크롤
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (hashHandledRef.current) return;
     const h = window.location.hash;
     if (!h || !answers) return;
     const el = document.querySelector(h) as HTMLElement | null;
     if (el) {
       setTimeout(() => {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        hashHandledRef.current = true;
       }, 0);
       return;
     }
@@ -377,6 +419,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
             setTimeout(() => {
               const el2 = document.querySelector(h) as HTMLElement | null;
               if (el2) el2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              hashHandledRef.current = true;
             }, 50);
             break;
           }
@@ -385,7 +428,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
         // ignore
       }
     })();
-  }, [answers]);
+  }, [answers, id]);
 
   async function adopt(answerPostId: number) {
     if (!isAuthor) {
@@ -460,9 +503,31 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
       });
       setUserPage(moreUsers.number ?? nextPage);
       setUserHasMore(hasMoreUsers(moreUsers));
+      // 추가 로드된 답변들의 댓글 총개수도 비동기로 로드
+      try {
+        const list = (moreUsers.content || []) as Array<{ id: string }>;
+        for (const u of list) {
+          const aid = Number(u.id);
+          if (!Number.isFinite(aid)) continue;
+          commentApi.list(aid, 0, 1).then((c) => {
+            if (typeof c.totalElements === 'number') setCommentTotals((prev) => ({ ...prev, [String(aid)]: c.totalElements as number }));
+          }).catch(() => {});
+        }
+      } catch {}
     } finally {
       setLoadingMore(false);
     }
+  }
+
+  // 댓글 더보기 클릭 시 화면 점프 방지: 버튼 위치 보정
+  async function handleMoreCommentsClick(e: React.MouseEvent<HTMLButtonElement>, answerId: number) {
+    const key = String(answerId);
+    const currentPage = commentsPage[key] || 0;
+    const beforeTop = e.currentTarget.getBoundingClientRect().top;
+    await loadComments(answerId, currentPage + 1);
+    const afterTop = e.currentTarget.getBoundingClientRect().top;
+    const delta = afterTop - beforeTop;
+    if (Math.abs(delta) > 1) window.scrollBy({ top: delta, left: 0, behavior: 'instant' as ScrollBehavior });
   }
 
   const subjectLabel = question?.subjectName || question?.subject || '-';
@@ -552,7 +617,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
       if (answerTitleRef.current) answerTitleRef.current.value = '';
       if (answerContentRef.current) answerContentRef.current.value = '';
       await loadAll();
-    } catch (e) {
+    } catch {
       alert('답변 등록 중 오류가 발생했습니다.');
     } finally {
       setAnswerSubmitting(false);
@@ -711,7 +776,11 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
                   onClick={() => toggleComments(Number(u.id))}
                   className='inline-flex items-center gap-1 text-xs text-gray-700 bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded'
                 >
-                  <span>{openComments[String(u.id)] ? '댓글 숨기기' : `댓글 보기 (${calcCommentCount(Number(u.id))})`}</span>
+                  <span>
+                    {openComments[String(u.id)]
+                      ? '댓글 숨기기'
+                      : `댓글 보기 (${(commentTotals[String(u.id)] ?? calcCommentCount(Number(u.id)))})`}
+                  </span>
                   <span className='text-[10px]'>{openComments[String(u.id)] ? '▲' : '▼'}</span>
                 </button>
                 {openComments[String(u.id)] && (
@@ -944,7 +1013,7 @@ export default function BoardDetailPage({ params }: { params: Promise<{ id: stri
                         <div className='mt-3 text-center'>
                           <button
                             type='button'
-                            onClick={() => loadComments(Number(u.id), (commentsPage[String(u.id)] || 0) + 1)}
+                            onClick={(e) => handleMoreCommentsClick(e, Number(u.id))}
                             className='px-3 py-1.5 rounded-md border text-xs bg-white hover:bg-gray-50'
                             disabled={loadingComments[String(u.id)]}
                           >
