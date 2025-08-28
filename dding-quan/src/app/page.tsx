@@ -181,7 +181,7 @@ export default function Home() {
               <BookOpen size={20} />
               최근 질문들
             </h2>
-            <Link href='/board/boardHistory' className='text-sm text-blue-600 hover:underline flex items-center gap-1'>
+            <Link href='/board' className='text-sm text-blue-600 hover:underline flex items-center gap-1'>
               전체 보기 →
             </Link>
           </div>
