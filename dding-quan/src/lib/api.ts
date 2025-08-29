@@ -713,7 +713,7 @@ export const historyApi = {
 };
 
 // ----- AI Problem submit (custom endpoint) -----
-export async function createAiProblem(payload: { subjectId: number; file: File }): Promise<unknown> {
+export async function createAiProblem(payload: { subjectId: number; file: File }): Promise<Blob> {
   const fd = new FormData();
   fd.append('subjectId', String(payload.subjectId));
   // Backend expects the file part name to be 'imageFile'
@@ -725,9 +725,13 @@ export async function createAiProblem(payload: { subjectId: number; file: File }
     const t = await res.text().catch(() => '');
     throw new Error(`Failed to submit problem: ${res.status} ${t}`);
   }
-  try {
-    return (await res.json()) as unknown;
-  } catch {
-    return {} as unknown;
+  // Server returns application/pdf inline; return the Blob so caller can open it
+  const blob = await res.blob();
+  // Optional: basic validation
+  const ct = res.headers.get('Content-Type') || '';
+  if (!ct.includes('application/pdf')) {
+    // Still return the blob, but surface a warning for easier debugging
+    console.warn('Unexpected content type for AI problem PDF:', ct);
   }
+  return blob;
 }
