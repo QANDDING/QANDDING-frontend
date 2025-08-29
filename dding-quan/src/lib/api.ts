@@ -720,7 +720,12 @@ export async function createAiProblem(payload: { subjectId: number; file: File }
   fd.append('imageFile', payload.file);
 
   const url = `${BASE_URL}/api/v1/problems`;
-  const res = await authenticatedFetch(url, { method: 'POST', body: fd });
+  const res = await authenticatedFetch(url, {
+    method: 'POST',
+    body: fd,
+    // Ensure server knows we expect PDF and include auth via authenticatedFetch
+    headers: { Accept: 'application/pdf' },
+  });
   if (!res.ok) {
     const t = await res.text().catch(() => '');
     throw new Error(`Failed to submit problem: ${res.status} ${t}`);
