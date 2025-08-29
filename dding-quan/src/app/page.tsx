@@ -137,10 +137,23 @@ export default function Home() {
       toast.error('이미지 1개를 업로드해주세요.');
       return;
     }
+    let popup: Window | null = null;
     try {
       setSubmitting(true);
-      await createAiProblem({ subjectId: selectedSubject.id, file });
-      toast.success('문제 업로드를 완료했어요.');
+      // Open a new tab immediately to avoid popup blockers
+      popup = typeof window !== 'undefined' ? window.open('', '_blank', 'noopener,noreferrer') : null;
+
+      const pdfBlob = await createAiProblem({ subjectId: selectedSubject.id, file });
+      const url = URL.createObjectURL(pdfBlob);
+      if (popup) {
+        popup.location.href = url;
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+      // Revoke later to free memory
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
+      toast.success('문제 업로드를 완료했어요. PDF를 새 탭에서 열었어요.');
       setShowAiModal(false);
       setSubjectQuery('');
       setSubjectResults([]);
@@ -149,6 +162,9 @@ export default function Home() {
       // 메인 페이지로 이동
       router.replace('/');
     } catch (e: unknown) {
+      if (popup && !popup.closed) {
+        try { popup.close(); } catch {}
+      }
       console.error(e);
       const msg = e instanceof Error ? e.message : '업로드 중 오류가 발생했어요.';
       toast.error(msg);
